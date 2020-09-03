@@ -63,18 +63,48 @@ def lambda_handler(event, context):
 
 def callback_query_handler(body):
     
-    callback_query_id = body['callback_query']['id']
-    # TODO: Figure out how to respond to callback_query
-    answer_callback_query(callback_query_id)
+    try:
+        callback_query_id      = body['callback_query']['id']
+        callback_query_from    = body['callback_query']['from']
+        callback_query_message = body['callback_query']['message']
+        callback_query_data    = body['callback_query']['data']
+        
+        # Validate callback_query_data is a digit
+        if not callback_query_data.isdigit():
+            return send_message('Received invalid callback_query_data: {0}'.format(callback_query_data), ADMIN_CHAT_ID, None)
+        
+        user_id = callback_query_from['id']
+        chat_id = callback_query_message['chat']['id']
+        
+        msg_txt = callback_query_message["text"].split(';')[0]
+        
+        if re.match('^Raid\s(\d)+$', msg_txt):
+            raid_id = msg_txt.split(' ')[1]
+
+            if raid.join_raid(callback_query_from, raid_id, callback_query_data):
+                send_message('{0}'.format('something changed'), chat_id, None)
+                # Now need to update every message that has referenced this raid and update it
+                # TODO - UP TO HERE
+            #else:
+            #    send_message('{0}'.format('nothing changed'), chat_id, None)
+        else:
+            send_message('An unrecognised callback query was received: {0}'.format(body), ADMIN_CHAT_ID, None)
+    
+    except Exception as e:
+        send_message('*\[ERROR\]* An unhandled error has occured\. Please try again in a few minutes\.', chat_id, 'MarkdownV2')
+        send_message('An unhandled error of type {0} has occured: {1}'.format(type(e), e.args), ADMIN_CHAT_ID, None)
+        
+    finally:
+        answer_callback_query(callback_query_id)
         
 def bot_command_newraid(raid_params, chat_id):
 
     raid_info = raid.create_raid(raid_params, chat_id)
     
     if raid_info.get('error'):
-        send_message('ERROR: {0}'.format(raid_info.get('error')), chat_id, None)
-    else:
-        send_message('Raid created: {0}'.format(raid_info), chat_id, None)
+        return send_message('ERROR: {0}'.format(raid_info.get('error')), chat_id, None)
+    
+    bot_command_raid(str(raid_info.get('raid_id')), chat_id)
         
 def bot_command_listraids(chat_id):
     
@@ -85,7 +115,10 @@ def bot_command_listraids(chat_id):
     else:
         for r in raid_list:
             send_message(raid.format_raid_message(r), chat_id, 'MarkdownV2')
-            
+
+# Given a valid raid id number and a chat window:
+# This method will return a formatted message displaying the raid details.
+# It will also add the sent message id to the tracking table so updates can be sent.
 def bot_command_raid(command_params, chat_id):
     
     if not re.match('^\d+$', command_params):
@@ -95,21 +128,37 @@ def bot_command_raid(command_params, chat_id):
     if not raid_detail:
         return send_message('That is not a valid raid id.', chat_id, None)
         
-    send_message(raid.format_raid_message(raid_detail), chat_id, 'MarkdownV2', True)
+    tracked_message = send_message(raid.format_raid_message(raid_detail), chat_id, 'MarkdownV2', True)
+    tracked_data = json.loads(tracked_message.data.decode("utf-8"))
+    raid.insert_message_tracking(command_params, tracked_data['result']['chat']['id'], tracked_data['result']['message_id'])
 
 def send_message(text, chat_id, parse_mode=None, send_keyboard=None):
     
     url = URL + "sendMessage?text={0}&chat_id={1}&parse_mode={2}".format(text, chat_id, parse_mode)
     
     if send_keyboard:
-        url += '&reply_markup={"inline_keyboard":[[{"text":"Physical","callback_data":"Physical"},{"text":"Remote","callback_data":"Remote"},{"text":"Invite","callback_data":"Invite"}]]}'
+        url += '&reply_markup={"inline_keyboard":[[{"text":"Physical","callback_data":1}, \
+        {"text":"Remote","callback_data":2},{"text":"Invite","callback_data":3}]]}'
     
     http = urllib3.PoolManager()
     resp = http.request('GET', url)
+    
+    return resp
 
 def answer_callback_query(callback_query_id):
     
     url = URL + "answerCallbackQuery?callback_query_id={0}".format(callback_query_id)
 
+    http = urllib3.PoolManager()
+    resp = http.request('GET', url)
+    
+def edit_message(chat_id, message_id, text, parse_mode=None, send_keyboard=None):
+    
+    url = URL + "editMessageText?chat_id={0}&message_id={1}&text={2}&parse_mode={3}".format(chat_id, message_id, text, parse_mode)
+    
+    if send_keyboard:
+        url += '&reply_markup={"inline_keyboard":[[{"text":"Physical","callback_data":1}, \
+        {"text":"Remote","callback_data":2},{"text":"Invite","callback_data":3}]]}'
+    
     http = urllib3.PoolManager()
     resp = http.request('GET', url)
