@@ -3,8 +3,8 @@ from datetime import datetime
 from datetime import date
 import database_connection as db
 
-def create_raid(raid_params, raid_creator_id):
-
+def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
+    
     # Stage 1: Validate Raid Params.
 
     # a) At a very basic level the raid params must be at least 10 chars.
@@ -50,10 +50,11 @@ def create_raid(raid_params, raid_creator_id):
         return { "error": "You must provide a raid title and raid location separated by a single @ symbol." }
 
     # h) If we are here we can parse the remaining params to get the raid title and raid location
-    #    Also make a note of the raid_creator_id - they will have admin rights for the raid
+    #    Also make a note of the raid_creator info - they will have admin rights for the raid
     raid_dict["raid_title"] = remaining.split('@')[0].strip()
     raid_dict["raid_location"] = remaining.split('@')[1].strip()
     raid_dict["raid_creator_id"] = raid_creator_id
+    raid_dict["raid_creator_username"] = raid_creator_username
 
     # Stage 2: We have the information we need to create a raid.
     #          So lets do that and return the result back to the handler.
@@ -94,6 +95,15 @@ def determine_raid_time(input):
         
 def insert_raid(raid_dict):
     
+    #return { "error": raid_dict.get('raid_creator_username') }
+    
+    # Step 1: Verify the user exists in the raiders table
+    #.        If they don't then create them!
+    if not get_raider_by_id(raid_dict.get('raid_creator_id')):
+        #return { "error": "hey {0}".format(get_raider_by_id(raid_dict.get('raid_creator_id'))) }
+        insert_raider(raid_dict.get('raid_creator_id'), raid_dict.get('raid_creator_username'))
+        return { "error ": "do weeeeee get here" }
+    
     # Connect to the database
     connection = db.connect()
     
@@ -132,7 +142,7 @@ def get_raid_by_id(raid_id):
     
     try:
         with connection.cursor() as cursor:
-            sql = "SELECT * FROM `raids` WHERE `raid_id` = {0}".format(raid_id)
+            sql = "SELECT * FROM `vw_raids` WHERE `raid_id` = {0}".format(raid_id)
             cursor.execute(sql)
             result = cursor.fetchone()
 
@@ -172,60 +182,48 @@ def list_raids():
     return result
 
 def format_raid_message(raid_dict):
-    
-    # TODO: This has become a mess - I need to refactor this!
 
     if raid_dict.get('raid_datetime').date() == datetime.today().date():
         raid_datetime_string = raid_dict.get('raid_datetime').strftime("%H:%M")
     else:
         raid_datetime_string = raid_dict.get('raid_datetime').strftime("%d\-%b\-%y\, %H:%M")
-        
-    raid_participant_dict = get_raid_participants_by_id(raid_dict.get('raid_id'))
     
-    participation = 'There are currently no participants for this raid\.'
-    if raid_participant_dict:
-        participation = ''
+    raid_participant_dict = get_raid_participants_by_id(raid_dict.get('raid_id'))
+    if not raid_participant_dict:
+        participation = 'There are currently no participants for this raid\.'
+    
+    else:
         
-        physical=False
-        remote=False
-        invite=False
+        physical_count = 0
+        remote_count   = 0
+        invite_count   = 0
         
-        going_str = ""
-        invite_str = ""
-        remote_str = ""
-        
+        # Iterate through participants to get their status
         for p in raid_participant_dict:
             
             if p.get('participation_type_id') == 1:
-                if not physical:
-                    physical=True
-                    going_str = "*Going In Person*"
-                
-                going_str += ('\n{0}'.format(p.get('username')))
+                physical_str = ''.join(['{0}\n{1}'.format(physical_str, p.get('username')) if not physical_count == 0 else p.get('username')])
+                physical_count += 1
                 
             elif p.get('participation_type_id') == 2:
-                if not remote:
-                    remote=True
-                    remote_str = "*Joining Remotely*"
-                
-                remote_str += ('\n{0}'.format(p.get('username')))
+                remote_str = ''.join(['{0}\n{1}'.format(remote_str, p.get('username')) if not remote_count == 0 else p.get('username')])
+                remote_count += 1
                 
             elif p.get('participation_type_id') == 3:
-                if not invite:
-                    invite=True
-                    invite_str = "*Requesting an Invite*"
+                invite_str = ''.join(['{0}\n{1}'.format(invite_str, p.get('username')) if not invite_count == 0 else p.get('username')])
+                invite_count += 1
                 
-                invite_str += ('\n{0}'.format(p.get('username')))
-
-        participation += ('{0}\n{1}\n{2}'.format(going_str,remote_str,invite_str))
+        participation = ''.join('*{0} Going In Person:*\n{1}\n'.format(physical_count, physical_str) if not physical_count == 0 else '')
+        participation += ''.join('*{0} Joining Remotely:*\n{1}\n'.format(remote_count, remote_str) if not remote_count == 0 else '')
+        participation += ''.join('*{0} Requesting an Invite:*\n{1}\n'.format(invite_count, invite_str) if not invite_count == 0 else '')
     
     # IT IS VERY IMPORTANT THAT THE MESSAGE STARTS WITH 'Raid {raid_id};'
     # IT IS USED TO PARSE CALLBACK RESPONSES TO FIGURE OUT THE RAID ID
-    return "*Raid* {0}; *Organiser:* {1}\n*Title:* {2}\n*Time and Place:* {3} \@ {4}\n\n{5}".format(
+    return "*Raid* {0}; *Organiser:* {1}\n*Time and Title:* {2} \- {3}\n*Location:* {4}\n\n{5}".format(
                                             raid_dict.get('raid_id'), \
-                                            raid_dict.get('raid_creator_id'),
-                                            raid_dict.get('raid_title'),
+                                            raid_dict.get('raid_creator_username'),
                                             raid_datetime_string,
+                                            raid_dict.get('raid_title'),
                                             raid_dict.get('raid_location'),
                                             participation
                                         )
@@ -250,6 +248,21 @@ def insert_message_tracking(raid_id, chat_id, message_id):
         
     finally:
         connection.close()
+        
+def get_message_tracking_by_id(raid_id):
+    
+    connection = db.connect()
+    
+    try:
+        with connection.cursor() as cursor:
+            sql = "SELECT * FROM `message_tracking` WHERE `raid_id` = {0}".format(raid_id)
+            cursor.execute(sql)
+            result = cursor.fetchall()
+
+    finally:
+        connection.close()
+        
+    return result
         
 def get_raid_participation_by_id(raid_id, raider_id):
     
@@ -303,10 +316,7 @@ def update_raid_participation(raid_id, raider_id, participation_type_id):
     finally:
         connection.close()
     
-def insert_raider(user_info):
-    
-    telegram_id = user_info['id']
-    username = user_info['username']
+def insert_raider(telegram_id, username):
     
     # Connect to the database
     connection = db.connect()
@@ -355,7 +365,7 @@ def join_raid(from_object, raid_id, participation_type_id):
     # Step 1: Verify the user exists in the raiders table
     #.        If they don't then create them!
     if not get_raider_by_id(from_object['id']):
-        insert_raider(from_object)
+        insert_raider(from_object['id'], from_object['username'])
         
     # Step 2: See if the user is already participating in the raid
     #         They may have changed their participation type
