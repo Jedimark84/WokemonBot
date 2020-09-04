@@ -24,28 +24,57 @@ def lambda_handler(event, context):
     try:
         body = json.loads(event['body'])
         
+        send_message('ADMIN TRACKING: {0}'.format(body), 581975002)
+        
         if 'callback_query' in body:
-            callback_query_handler(body)
+            callback_query = body['callback_query']
+            callback_query_handler(callback_query)
             return
-            
-        chat_id = body['message']['chat']['id']
-        text = body['message']['text'].strip()
         
-        if re.match('^/[a-z0-9]+($|\s)', text):
-            bot_command=re.match('^/[a-z0-9]+($|\s)', text)[0].strip()
-            bot_command_params=text.replace(bot_command,'').strip()
+        if 'message' in body:
+            message = body['message']
+            chat = message['chat']
+                
+            if 'new_chat_participant' in message:
+                new_chat_participant = message['new_chat_participant']
+                send_message('new_chat_participant message received: {0}'.format(body), ADMIN_CHAT_ID, None)
+                return
+                
+            if 'left_chat_participant' in message:
+                left_chat_participant = message['left_chat_participant']
+                send_message('left_chat_participant message received: {0}'.format(body), ADMIN_CHAT_ID, None)
+                return
             
-            if bot_command=='/listraids':
-                bot_command_listraids(chat_id)
-            elif bot_command=='/newraid':
-                bot_command_newraid(bot_command_params, chat_id)
-            elif bot_command=='/raid':
-                bot_command_raid(bot_command_params, chat_id)
-            else:
-                send_message('Unsupported Bot Command: {0}\nParams: {1}'.format(bot_command, bot_command_params), chat_id)
-        
-        else:
-            send_message('{0}'.format(body), chat_id)
+            if 'text' in message:
+                text = message['text'].strip()
+                
+                chat_id = chat['id']
+                
+                from_id = message['from']['id']
+                from_username = message['from']['username']
+                
+                if re.match('^/[a-z0-9]+($|\s)', text):
+                    
+                    bot_command=re.match('^/[a-z0-9]+($|\s)', text)[0].strip()
+                    bot_command_params=text.replace(bot_command,'').strip()
+                    
+                    if bot_command == '/newraid':
+                        bot_command_newraid(bot_command_params, chat_id, from_id, from_username)
+                        
+                    elif bot_command == '/raid':
+                        bot_command_raid(bot_command_params, chat_id)
+                        
+                    elif bot_command == '/listraids':
+                        bot_command_listraids(chat_id)
+                        
+                    else:
+                        send_message('Unsupported Bot Command: {0}\nParams: {1}'.format(bot_command, bot_command_params), chat_id)
+                else:
+                    send_message('{0}'.format(message), chat_id)
+                    
+                return
+
+        send_message('Unsupported event received with body: {0}'.format(body), ADMIN_CHAT_ID, None)
             
     except pymysql.err.ProgrammingError as pe:
         send_message('*\[ERROR\]* A database error has occured\. Please try again in a few minutes\.', chat_id, 'MarkdownV2')
@@ -53,7 +82,7 @@ def lambda_handler(event, context):
         
     except Exception as e:
         send_message('*\[ERROR\]* An unhandled error has occured\. Please try again in a few minutes\.', chat_id, 'MarkdownV2')
-        send_message('An unhandled error of type {0} has occured: {1}'.format(type(e), e.args), ADMIN_CHAT_ID, None)
+        send_message('An unhandled error of type {0} has occured: {1}\n\n{2}'.format(type(e), e.args, body), ADMIN_CHAT_ID, None)
     
     finally:
         return {
@@ -61,13 +90,13 @@ def lambda_handler(event, context):
             'body': json.dumps('Success.')
         }
 
-def callback_query_handler(body):
+def callback_query_handler(callback_query):
     
     try:
-        callback_query_id      = body['callback_query']['id']
-        callback_query_from    = body['callback_query']['from']
-        callback_query_message = body['callback_query']['message']
-        callback_query_data    = body['callback_query']['data']
+        callback_query_id      = callback_query['id']
+        callback_query_from    = callback_query['from']
+        callback_query_message = callback_query['message']
+        callback_query_data    = callback_query['data']
         
         # Validate callback_query_data is a digit
         if not callback_query_data.isdigit():
@@ -82,13 +111,15 @@ def callback_query_handler(body):
             raid_id = msg_txt.split(' ')[1]
 
             if raid.join_raid(callback_query_from, raid_id, callback_query_data):
-                send_message('{0}'.format('something changed'), chat_id, None)
-                # Now need to update every message that has referenced this raid and update it
-                # TODO - UP TO HERE
+                formatted_message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
+                tracking = raid.get_message_tracking_by_id(raid_id)
+                for t in tracking:
+                    edit_message(t.get('chat_id'),t.get('message_id'),formatted_message,'MarkdownV2', True)
+
             #else:
             #    send_message('{0}'.format('nothing changed'), chat_id, None)
         else:
-            send_message('An unrecognised callback query was received: {0}'.format(body), ADMIN_CHAT_ID, None)
+            send_message('An unrecognised callback query was received: {0}'.format(callback_query), ADMIN_CHAT_ID, None)
     
     except Exception as e:
         send_message('*\[ERROR\]* An unhandled error has occured\. Please try again in a few minutes\.', chat_id, 'MarkdownV2')
@@ -97,9 +128,9 @@ def callback_query_handler(body):
     finally:
         answer_callback_query(callback_query_id)
         
-def bot_command_newraid(raid_params, chat_id):
-
-    raid_info = raid.create_raid(raid_params, chat_id)
+def bot_command_newraid(raid_params, chat_id, from_id, from_username):
+    
+    raid_info = raid.create_raid(raid_params, chat_id, from_id, from_username)
     
     if raid_info.get('error'):
         return send_message('ERROR: {0}'.format(raid_info.get('error')), chat_id, None)
@@ -154,11 +185,19 @@ def answer_callback_query(callback_query_id):
     
 def edit_message(chat_id, message_id, text, parse_mode=None, send_keyboard=None):
     
+    #send_message('{0}'.format(chat_id), 581975002, None)
+    #send_message('{0}'.format(message_id), 581975002, None)
+    #send_message('{0}'.format(text), 581975002, None)
+    #send_message('{0}'.format(parse_mode), 581975002, None)
+    #send_message('{0}'.format(send_keyboard), 581975002, None)
+    
     url = URL + "editMessageText?chat_id={0}&message_id={1}&text={2}&parse_mode={3}".format(chat_id, message_id, text, parse_mode)
     
     if send_keyboard:
         url += '&reply_markup={"inline_keyboard":[[{"text":"Physical","callback_data":1}, \
         {"text":"Remote","callback_data":2},{"text":"Invite","callback_data":3}]]}'
+    
+    #send_message('{0}'.format(chat_id), 581975002, None)
     
     http = urllib3.PoolManager()
     resp = http.request('GET', url)
