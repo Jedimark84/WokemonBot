@@ -50,8 +50,18 @@ def lambda_handler(event, context):
                 
                 chat_id = chat['id']
                 
-                from_id = message['from']['id']
-                from_username = message['from']['username']
+                if 'from' in message:
+                    from_obj = message['from']
+                    from_id = from_obj['id']
+                    
+                    # Some people haven't set a username, so use first_name instead
+                    if 'username' in from_obj:
+                        from_username = from_obj['username']
+                    else:
+                        from_username = from_obj['first_name']
+                else:
+                    send_message('Received a message with no from: {0}'.format(body), ADMIN_CHAT_ID)
+                    return
                 
                 if re.match('^/[a-z0-9]+($|\s)', text):
                     
@@ -169,7 +179,7 @@ def send_message(text, chat_id, parse_mode=None, send_keyboard=None):
     
     if send_keyboard:
         url += '&reply_markup={"inline_keyboard":[[{"text":"Physical","callback_data":1}, \
-        {"text":"Remote","callback_data":2},{"text":"Invite","callback_data":3}]]}'
+        {"text":"Remote","callback_data":2},{"text":"Invite","callback_data":3},{"text":"X","callback_data":4}]]}'
     
     http = urllib3.PoolManager()
     resp = http.request('GET', url)
@@ -195,7 +205,7 @@ def edit_message(chat_id, message_id, text, parse_mode=None, send_keyboard=None)
     
     if send_keyboard:
         url += '&reply_markup={"inline_keyboard":[[{"text":"Physical","callback_data":1}, \
-        {"text":"Remote","callback_data":2},{"text":"Invite","callback_data":3}]]}'
+        {"text":"Remote","callback_data":2},{"text":"Invite","callback_data":3},{"text":"X","callback_data":4}]]}'
     
     #send_message('{0}'.format(chat_id), 581975002, None)
     
