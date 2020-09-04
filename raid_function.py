@@ -197,6 +197,7 @@ def format_raid_message(raid_dict):
         physical_count = 0
         remote_count   = 0
         invite_count   = 0
+        dropout_count  = 0
         
         # Iterate through participants to get their status
         for p in raid_participant_dict:
@@ -213,9 +214,14 @@ def format_raid_message(raid_dict):
                 invite_str = ''.join(['{0}\n{1}'.format(invite_str, p.get('username')) if not invite_count == 0 else p.get('username')])
                 invite_count += 1
                 
+            elif p.get('participation_type_id') == 0:
+                dropout_str = ''.join(['{0}\n{1}'.format(dropout_str, p.get('username')) if not dropout_count == 0 else p.get('username')])
+                dropout_count += 1
+                
         participation = ''.join('*{0} Going In Person:*\n{1}\n'.format(physical_count, physical_str) if not physical_count == 0 else '')
         participation += ''.join('*{0} Joining Remotely:*\n{1}\n'.format(remote_count, remote_str) if not remote_count == 0 else '')
         participation += ''.join('*{0} Requesting an Invite:*\n{1}\n'.format(invite_count, invite_str) if not invite_count == 0 else '')
+        participation += ''.join('*{0} Dropped Out:*\n{1}\n'.format(dropout_count, dropout_str) if not dropout_count == 0 else '')
     
     # IT IS VERY IMPORTANT THAT THE MESSAGE STARTS WITH 'Raid {raid_id};'
     # IT IS USED TO PARSE CALLBACK RESPONSES TO FIGURE OUT THE RAID ID
