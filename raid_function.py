@@ -214,7 +214,7 @@ def format_raid_message(raid_dict):
                 invite_str = ''.join(['{0}\n{1}'.format(invite_str, p.get('username')) if not invite_count == 0 else p.get('username')])
                 invite_count += 1
                 
-            elif p.get('participation_type_id') == 0:
+            elif p.get('participation_type_id') == 4:
                 dropout_str = ''.join(['{0}\n{1}'.format(dropout_str, p.get('username')) if not dropout_count == 0 else p.get('username')])
                 dropout_count += 1
                 
@@ -377,14 +377,15 @@ def join_raid(from_object, raid_id, participation_type_id):
     #         They may have changed their participation type
     #         Or just sending a duplicate request which we should ignore
     #         If they are not already participating - then add them
+    #         If they are trying to drop out of a raid they are not in - then ignore
     p = get_raid_participation_by_id(raid_id, from_object['id'])
     if not p:
-        return insert_raid_participation(raid_id, from_object['id'], participation_type_id)
+        if not participation_type_id == '4':
+            return insert_raid_participation(raid_id, from_object['id'], participation_type_id)
     else:
         if p.get('participation_type_id') == int(participation_type_id):
             return False
         else:
             return update_raid_participation(raid_id, from_object['id'], participation_type_id)
     
-    # We should never get here!
     return False

@@ -179,7 +179,7 @@ def send_message(text, chat_id, parse_mode=None, send_keyboard=None):
     
     if send_keyboard:
         url += '&reply_markup={"inline_keyboard":[[{"text":"Physical","callback_data":1}, \
-        {"text":"Remote","callback_data":2},{"text":"Invite","callback_data":3}]]}'
+        {"text":"Remote","callback_data":2},{"text":"Invite","callback_data":3},{"text":"X","callback_data":4}]]}'
     
     http = urllib3.PoolManager()
     resp = http.request('GET', url)
@@ -205,7 +205,7 @@ def edit_message(chat_id, message_id, text, parse_mode=None, send_keyboard=None)
     
     if send_keyboard:
         url += '&reply_markup={"inline_keyboard":[[{"text":"Physical","callback_data":1}, \
-        {"text":"Remote","callback_data":2},{"text":"Invite","callback_data":3},{"text":"X","callback_data":0}]]}'
+        {"text":"Remote","callback_data":2},{"text":"Invite","callback_data":3},{"text":"X","callback_data":4}]]}'
     
     #send_message('{0}'.format(chat_id), 581975002, None)
     
