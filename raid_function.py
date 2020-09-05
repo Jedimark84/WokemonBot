@@ -102,7 +102,7 @@ def insert_raid(raid_dict):
     if not get_raider_by_id(raid_dict.get('raid_creator_id')):
         #return { "error": "hey {0}".format(get_raider_by_id(raid_dict.get('raid_creator_id'))) }
         insert_raider(raid_dict.get('raid_creator_id'), raid_dict.get('raid_creator_username'))
-        return { "error ": "do weeeeee get here" }
+        return { "error ": "do we ever get here" }
     
     # Connect to the database
     connection = db.connect()
@@ -180,6 +180,13 @@ def list_raids():
         connection.close()
         
     return result
+    
+def format_raider(raider_dict):
+    
+    player_str = ''.join([raider_dict.get('username') if not raider_dict.get('nickname') else raider_dict.get('nickname')])
+    player_str = ''.join(['{0} {1}'.format(player_str, 'with {0} other\(s\)'.format(raider_dict.get('party_count')-1)) if not raider_dict.get('party_count') == 1 else player_str])
+        
+    return player_str
 
 def format_raid_message(raid_dict):
 
@@ -203,25 +210,25 @@ def format_raid_message(raid_dict):
         for p in raid_participant_dict:
             
             if p.get('participation_type_id') == 1:
-                physical_str = ''.join(['{0}\n{1}'.format(physical_str, p.get('username')) if not physical_count == 0 else p.get('username')])
-                physical_count += 1
+                physical_str = ''.join(['{0}\n{1}'.format(physical_str, format_raider(p)) if not physical_count == 0 else format_raider(p)])
+                physical_count += p.get('party_count')
                 
             elif p.get('participation_type_id') == 2:
-                remote_str = ''.join(['{0}\n{1}'.format(remote_str, p.get('username')) if not remote_count == 0 else p.get('username')])
-                remote_count += 1
+                remote_str = ''.join(['{0}\n{1}'.format(remote_str, format_raider(p)) if not remote_count == 0 else format_raider(p)])
+                remote_count += p.get('party_count')
                 
             elif p.get('participation_type_id') == 3:
-                invite_str = ''.join(['{0}\n{1}'.format(invite_str, p.get('username')) if not invite_count == 0 else p.get('username')])
-                invite_count += 1
+                invite_str = ''.join(['{0}\n{1}'.format(invite_str, format_raider(p)) if not invite_count == 0 else format_raider(p)])
+                invite_count += p.get('party_count')
                 
             elif p.get('participation_type_id') == 4:
-                dropout_str = ''.join(['{0}\n{1}'.format(dropout_str, p.get('username')) if not dropout_count == 0 else p.get('username')])
-                dropout_count += 1
+                dropout_str = ''.join(['{0}\n{1}'.format(dropout_str, format_raider(p)) if not dropout_count == 0 else format_raider(p)])
+                dropout_count += p.get('party_count')
                 
         participation = ''.join('*{0} Going In Person:*\n{1}\n'.format(physical_count, physical_str) if not physical_count == 0 else '')
         participation += ''.join('*{0} Joining Remotely:*\n{1}\n'.format(remote_count, remote_str) if not remote_count == 0 else '')
         participation += ''.join('*{0} Requesting an Invite:*\n{1}\n'.format(invite_count, invite_str) if not invite_count == 0 else '')
-        participation += ''.join('*{0} Dropped Out:*\n{1}\n'.format(dropout_count, dropout_str) if not dropout_count == 0 else '')
+        participation += ''.join('*Dropped Out:*\n{0}\n'.format(dropout_str) if not dropout_count == 0 else '')
     
     # IT IS VERY IMPORTANT THAT THE MESSAGE STARTS WITH 'Raid {raid_id};'
     # IT IS USED TO PARSE CALLBACK RESPONSES TO FIGURE OUT THE RAID ID
@@ -307,8 +314,8 @@ def update_raid_participation(raid_id, raider_id, participation_type_id):
     
     try:
         with connection.cursor() as cursor:
-            # Create a new record
-            sql = "UPDATE `raid_participants` SET `participation_type_id` = {0} WHERE (`raid_id` = {1}) and (`raider_id` = {2})".format(participation_type_id, raid_id, raider_id)
+            # Update an existing record
+            sql = "UPDATE `raid_participants` SET `participation_type_id` = {0}, `party_count` = 1 WHERE (`raid_id` = {1}) and (`raider_id` = {2})".format(participation_type_id, raid_id, raider_id)
             cursor.execute(sql)
 
         connection.commit()
@@ -366,6 +373,7 @@ def insert_raid_participation(raid_id, raider_id, participation_type_id):
     finally:
         connection.close()
 
+# This code needs cleaning up - too many conditionals
 def join_raid(from_object, raid_id, participation_type_id):
     
     # Step 1: Verify the user exists in the raiders table
@@ -378,14 +386,45 @@ def join_raid(from_object, raid_id, participation_type_id):
     #         Or just sending a duplicate request which we should ignore
     #         If they are not already participating - then add them
     #         If they are trying to drop out of a raid they are not in - then ignore
+    #         Or they could be adding a plus one to the
     p = get_raid_participation_by_id(raid_id, from_object['id'])
     if not p:
-        if not participation_type_id == '4':
+        if not (participation_type_id == '0' or participation_type_id == '4'):
             return insert_raid_participation(raid_id, from_object['id'], participation_type_id)
     else:
         if p.get('participation_type_id') == int(participation_type_id):
             return False
+        elif participation_type_id == '0':
+            # They hit the +1 button?
+            return update_raid_with_a_plus_one(raid_id, from_object['id'], participation_type_id)
         else:
             return update_raid_participation(raid_id, from_object['id'], participation_type_id)
     
     return False
+
+def update_raid_with_a_plus_one(raid_id, raider_id, participation_type_id):
+    
+    # TODO: Implement restrictions on joining raids here
+    return (increment_party_count(raid_id, raider_id))
+    
+def increment_party_count(raid_id, raider_id):
+    
+    # Connect to the database
+    connection = db.connect()
+    
+    try:
+        with connection.cursor() as cursor:
+            # Update an existing record
+            sql = "UPDATE `raid_participants` SET `party_count` = `party_count` + 1 WHERE `raid_id` = {0} and `raider_id` = {1}".format(raid_id, raider_id)
+            cursor.execute(sql)
+
+        connection.commit()
+        
+        return True
+    
+    # If there is an error then raise it to the calling function.
+    # It should get handled by the lambda_handler function.
+    #except Exception as e: raise
+        
+    finally:
+        connection.close()
