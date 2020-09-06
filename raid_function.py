@@ -425,8 +425,8 @@ def join_raid(from_object, raid_id, participation_type_id):
         if p.get('participation_type_id') == int(participation_type_id):
             return False
         
-        # ... do they want to bring a plus 1?
-        elif participation_type_id == '0':
+        # ... if they aren't a drop out, they can bring a plus 1?
+        elif participation_type_id == '0' and not p['participation_type_id'] == 4:
             return update_raid_with_a_plus_one(raid_id, from_object['id'], participation_type_id)
         
         # ... else they must be changing their participation type
