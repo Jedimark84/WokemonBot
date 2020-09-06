@@ -373,33 +373,67 @@ def insert_raid_participation(raid_id, raider_id, participation_type_id):
     finally:
         connection.close()
 
-# This code needs cleaning up - too many conditionals
 def join_raid(from_object, raid_id, participation_type_id):
     
     # Step 1: Verify the user exists in the raiders table
-    #.        If they don't then create them!
+    #         If they don't then create them!
     if not get_raider_by_id(from_object['id']):
+        # TODO: I think users can exist without a username
         insert_raider(from_object['id'], from_object['username'])
+    
+    # Step 2: If this is not a drop out request, is there space in the raid for another user?
+    if int(participation_type_id) < 4:
+        raid_dict = get_raid_participants_by_id(raid_id)
+        if raid_dict:
+            # Count physical raiders and remote raiders
+            physical_count = 0
+            remote_count = 0
+            
+            for r in raid_dict:
+                if r['participation_type_id'] == 1:
+                    physical_count += r['party_count']
+                elif r['participation_type_id'] == 2 or r['participation_type_id'] == 3:
+                    remote_count += r['party_count']
+            
+            # If there are already 20 people going, then the raid is full
+            if (physical_count + remote_count) >= 20:
+                # Raid lobby is full
+                return False
+            
+            # If the user will be joining the remote lobby then check there are not 10 in it already
+            if int(participation_type_id) == 2 or int(participation_type_id) == 3:
+                if remote_count >= 10:
+                    # Remote lobby is full
+                    return False
         
-    # Step 2: See if the user is already participating in the raid
-    #         They may have changed their participation type
-    #         Or just sending a duplicate request which we should ignore
-    #         If they are not already participating - then add them
-    #         If they are trying to drop out of a raid they are not in - then ignore
-    #         Or they could be adding a plus one to the
+    # There is space available in the raid!
+        
+    # Step 3: See if the user is already participating in this raid
     p = get_raid_participation_by_id(raid_id, from_object['id'])
+    
+    # If they are not participating already...
     if not p:
+        # ... check the user is not trying to drop out of a raid they are not even ticked in for
+        # ... or that they have pressed the +1 button
         if not (participation_type_id == '0' or participation_type_id == '4'):
+            # Else we can add them to the raid
             return insert_raid_participation(raid_id, from_object['id'], participation_type_id)
+    
+    # If the user is already participating...
     else:
+        # ... ignore duplicate requests
         if p.get('participation_type_id') == int(participation_type_id):
             return False
+        
+        # ... do they want to bring a plus 1?
         elif participation_type_id == '0':
-            # They hit the +1 button?
             return update_raid_with_a_plus_one(raid_id, from_object['id'], participation_type_id)
+        
+        # ... else they must be changing their participation type
         else:
             return update_raid_participation(raid_id, from_object['id'], participation_type_id)
     
+    # I don't think it should be possible to get to this point
     return False
 
 def update_raid_with_a_plus_one(raid_id, raider_id, participation_type_id):
