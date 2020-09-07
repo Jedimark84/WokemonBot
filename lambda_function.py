@@ -1,7 +1,7 @@
 import json
 import os
 import re
-import urllib3 # Useful page: http://zetcode.com/python/urllib3/
+import urllib3
 
 import raid_function as raid
 import database_connection as db
@@ -34,6 +34,11 @@ def lambda_handler(event, context):
         if 'message' in body:
             message = body['message']
             chat = message['chat']
+            
+            if 'reply_to_message' in message:
+                #reply_to_message = message['reply_to_message']
+                reply_to_message_handler(message)
+                return
                 
             if 'new_chat_participant' in message:
                 new_chat_participant = message['new_chat_participant']
@@ -99,6 +104,36 @@ def lambda_handler(event, context):
             'statusCode': 200,
             'body': json.dumps('Success.')
         }
+        
+def reply_to_message_handler(message):
+    
+    message_id = message['message_id']
+    quoted_message_text = message['reply_to_message']['text']
+    reply_text = message['text']
+    
+    text_split = quoted_message_text.split(';')[0]
+        
+    if re.match('^Raid\s(\d)+$', text_split):
+        raid_id = text_split.split(' ')[1]
+        
+        from_obj = message['from']
+        from_id = from_obj['id']
+                    
+        # Some people haven't set a username, so use first_name instead
+        if 'username' in from_obj:
+            from_username = from_obj['username']
+        else:
+            from_username = from_obj['first_name']
+        
+        if raid.insert_raid_comment(reply_text, from_username, raid_id, message_id):
+            formatted_message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
+            tracking = raid.get_message_tracking_by_id(raid_id)
+            for t in tracking:
+                edit_message(t.get('chat_id'),t.get('message_id'),formatted_message,'MarkdownV2', True)
+    else:
+        send_message('Unsupported reply_to_message message received: {0}'.format(message), ADMIN_CHAT_ID, None)
+
+    return True
 
 def callback_query_handler(callback_query):
     

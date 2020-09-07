@@ -9,7 +9,7 @@ def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
 
     # a) At a very basic level the raid params must be at least 10 chars.
     if len(raid_params) < 10:
-        return { "error": "Raid parameters provided too short to be valid." }
+        return { "error": "Correct format is as follows (note date is optional)\n/newraid dd-Mmm-yy hh:mm Raid Title @ Raid Location" }
 
     # b) Validate the first param, it must either be a date or a time.
     raid_dict = determine_raid_date(raid_params.split(' ')[0])
@@ -95,14 +95,10 @@ def determine_raid_time(input):
         
 def insert_raid(raid_dict):
     
-    #return { "error": raid_dict.get('raid_creator_username') }
-    
     # Step 1: Verify the user exists in the raiders table
     #.        If they don't then create them!
     if not get_raider_by_id(raid_dict.get('raid_creator_id')):
-        #return { "error": "hey {0}".format(get_raider_by_id(raid_dict.get('raid_creator_id'))) }
         insert_raider(raid_dict.get('raid_creator_id'), raid_dict.get('raid_creator_username'))
-        return { "error ": "do we ever get here" }
     
     # Connect to the database
     connection = db.connect()
@@ -114,8 +110,8 @@ def insert_raid(raid_dict):
                     VALUES ({0}, '{1}', '{2}', '{3}')".format(
                         raid_dict.get('raid_creator_id'), \
                         raid_dict.get('raid_datetime').strftime("%Y/%m/%d, %H:%M:%S"), \
-                        raid_dict.get('raid_title'), \
-                        raid_dict.get('raid_location')
+                        escape(raid_dict.get('raid_title'), 50), \
+                        escape(raid_dict.get('raid_location'), 50)
                     )
             cursor.execute(sql)
         
@@ -229,16 +225,23 @@ def format_raid_message(raid_dict):
         participation += ''.join('*{0} Joining Remotely:*\n{1}\n'.format(remote_count, remote_str) if not remote_count == 0 else '')
         participation += ''.join('*{0} Requesting an Invite:*\n{1}\n'.format(invite_count, invite_str) if not invite_count == 0 else '')
         participation += ''.join('*Dropped Out:*\n{0}\n'.format(dropout_str) if not dropout_count == 0 else '')
+        
+    raid_comments_dict = get_raid_comments_by_id(raid_dict.get('raid_id'))
+    comments = ''
+    if raid_comments_dict:
+        for c in raid_comments_dict:
+            comments += '{0}: _{1}_\n'.format(c['username'], c['comment'])
     
     # IT IS VERY IMPORTANT THAT THE MESSAGE STARTS WITH 'Raid {raid_id};'
     # IT IS USED TO PARSE CALLBACK RESPONSES TO FIGURE OUT THE RAID ID
-    return "*Raid* {0}; *Organiser:* {1}\n*Time and Title:* {2} \- {3}\n*Location:* {4}\n\n{5}".format(
+    return "*Raid* {0}; *Organiser:* {1}\n*Time and Title:* {2} \- {3}\n*Location:* {4}\n\n{5}\n{6}".format(
                                             raid_dict.get('raid_id'), \
                                             raid_dict.get('raid_creator_username'),
                                             raid_datetime_string,
                                             raid_dict.get('raid_title'),
                                             raid_dict.get('raid_location'),
-                                            participation
+                                            participation,
+                                            comments
                                         )
 
 def insert_message_tracking(raid_id, chat_id, message_id):
@@ -250,7 +253,7 @@ def insert_message_tracking(raid_id, chat_id, message_id):
         with connection.cursor() as cursor:
             # Create a new record
             sql = "INSERT INTO `message_tracking` (`raid_id`, `chat_id`, `message_id`) \
-                    VALUES ({0}, '{1}', '{2}')".format(raid_id, chat_id, message_id)
+                    VALUES ({0}, {1}, {2})".format(raid_id, chat_id, message_id)
             cursor.execute(sql)
 
         connection.commit()
@@ -338,7 +341,7 @@ def insert_raider(telegram_id, username):
         with connection.cursor() as cursor:
             # Create a new record
             sql = "INSERT INTO `raiders` (`telegram_id`, `username`) \
-                    VALUES ({0}, '{1}')".format(telegram_id, username)
+                    VALUES ({0}, '{1}')".format(telegram_id, escape(username, 32))
             cursor.execute(sql)
 
         connection.commit()
@@ -438,7 +441,6 @@ def join_raid(from_object, raid_id, participation_type_id):
 
 def update_raid_with_a_plus_one(raid_id, raider_id, participation_type_id):
     
-    # TODO: Implement restrictions on joining raids here
     return (increment_party_count(raid_id, raider_id))
     
 def increment_party_count(raid_id, raider_id):
@@ -462,3 +464,64 @@ def increment_party_count(raid_id, raider_id):
         
     finally:
         connection.close()
+
+def insert_raid_comment(comment, username, raid_id, comment_id):
+    
+    # Connect to the database
+    connection = db.connect()
+    
+    try:
+        with connection.cursor() as cursor:
+            # Create a new record
+            sql = "INSERT INTO `raid_comments` (`comment_id`, `raid_id`, `username`, `comment`) \
+                    VALUES ({0}, {1}, '{2}', '{3}')".format(comment_id, raid_id, escape(username, 32), escape(comment, 50))
+            cursor.execute(sql)
+        
+        connection.commit()
+        
+        return True
+    
+    # If there is an error then raise it to the calling function.
+    # It should get handled by the lambda_handler function.
+    except Exception as e: raise
+    
+    finally:
+        connection.close()
+
+def escape(input, max_length):
+    
+    return input[:max_length].translate(str.maketrans({
+                                            "_": r"\\_",
+                                            "*": r"\\*",
+                                            "[": r"\\[",
+                                            "]": r"\\]",
+                                            "(": r"\\(",
+                                            ")": r"\\)",
+                                            "~": r"\\~",
+                                            "`": r"\\`",
+                                            ">": r"\\>",
+                                            "#": r"\\#",
+                                            "+": r"\\+",
+                                            "-": r"\\-",
+                                            "=": r"\\=",
+                                            "|": r"\\|",
+                                            "{": r"\\{",
+                                            "}": r"\\}",
+                                            ".": r"\\.",
+                                            "!": r"\\!"
+                                        })).strip()
+
+def get_raid_comments_by_id(raid_id):
+    
+    connection = db.connect()
+    
+    try:
+        with connection.cursor() as cursor:
+            sql = "SELECT * FROM `raid_comments` WHERE `raid_id` = {0}".format(raid_id)
+            cursor.execute(sql)
+            result = cursor.fetchall()
+    
+    finally:
+        connection.close()
+    
+    return result
