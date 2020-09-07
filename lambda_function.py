@@ -79,6 +79,9 @@ def lambda_handler(event, context):
                     elif bot_command == '/raid':
                         bot_command_raid(bot_command_params, chat_id)
                         
+                    elif bot_command == '/nickname':
+                        bot_command_nickname(bot_command_params, chat_id, from_id, from_username)
+                        
                     elif bot_command == '/listraids':
                         bot_command_listraids(chat_id)
                         
@@ -191,6 +194,16 @@ def bot_command_listraids(chat_id):
     else:
         for r in raid_list:
             send_message(raid.format_raid_message(r), chat_id, 'MarkdownV2')
+            
+def bot_command_nickname(command_params, chat_id, from_id, from_username):
+    
+    if not re.match('^[A-Za-z0-9]{5,32}$', command_params):
+        return send_message('ERROR: Invalid nickname provided. Please try again.', chat_id, None, None)
+    
+    if raid.update_nickname(from_id, from_username, command_params):
+        return send_message('Updated your nickname.', chat_id, None, None)
+    else:
+        return send_message('There was a problem updating your nickname. Please try again later.', chat_id, None, None)
 
 # Given a valid raid id number and a chat window:
 # This method will return a formatted message displaying the raid details.

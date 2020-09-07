@@ -92,6 +92,36 @@ def determine_raid_time(input):
         return find_time[0]
     else:
         return False
+    
+def update_nickname(telegram_id, username, nickname):
+    
+    # Step 1: Verify the user exists in the raiders table
+    #.        If they don't then create them!
+    if not get_raider_by_id(telegram_id):
+        insert_raider(telegram_id, username, nickname)
+    else:
+        
+        # Connect to the database
+        connection = db.connect()
+        
+        try:
+            with connection.cursor() as cursor:
+                # Update an existing record
+                sql = "UPDATE `raiders` SET `nickname` = '{0}' WHERE (`telegram_id` = {1})".format(escape(nickname, 32), telegram_id)
+                cursor.execute(sql)
+    
+            connection.commit()
+            
+            return True
+        
+        # If there is an error then raise it to the calling function.
+        # It should get handled by the lambda_handler function.
+        #except Exception as e: raise
+            
+        finally:
+            connection.close()
+        
+    return False
         
 def insert_raid(raid_dict):
     
@@ -181,7 +211,7 @@ def format_raider(raider_dict):
     
     player_str = ''.join([raider_dict.get('username') if not raider_dict.get('nickname') else raider_dict.get('nickname')])
     player_str = ''.join(['{0} {1}'.format(player_str, 'with {0} other\(s\)'.format(raider_dict.get('party_count')-1)) if not raider_dict.get('party_count') == 1 else player_str])
-        
+    
     return player_str
 
 def format_raid_message(raid_dict):
@@ -236,7 +266,7 @@ def format_raid_message(raid_dict):
     # IT IS USED TO PARSE CALLBACK RESPONSES TO FIGURE OUT THE RAID ID
     return "*Raid* {0}; *Organiser:* {1}\n*Time and Title:* {2} \- {3}\n*Location:* {4}\n\n{5}\n{6}".format(
                                             raid_dict.get('raid_id'), \
-                                            raid_dict.get('raid_creator_username'),
+                                            ''.join([raid_dict.get('raid_creator_username') if not raid_dict.get('raid_creator_nickname') else raid_dict.get('raid_creator_nickname')]),
                                             raid_datetime_string,
                                             raid_dict.get('raid_title'),
                                             raid_dict.get('raid_location'),
@@ -332,7 +362,7 @@ def update_raid_participation(raid_id, raider_id, participation_type_id):
     finally:
         connection.close()
     
-def insert_raider(telegram_id, username):
+def insert_raider(telegram_id, username, nickname=None):
     
     # Connect to the database
     connection = db.connect()
@@ -340,8 +370,12 @@ def insert_raider(telegram_id, username):
     try:
         with connection.cursor() as cursor:
             # Create a new record
-            sql = "INSERT INTO `raiders` (`telegram_id`, `username`) \
-                    VALUES ({0}, '{1}')".format(telegram_id, escape(username, 32))
+            if nickname:
+                sql = "INSERT INTO `raiders` (`telegram_id`, `username`, `nickname`) \
+                            VALUES ({0}, '{1}', '{2}')".format(telegram_id, escape(username, 32), escape(nickname, 32))
+            else:
+                sql = "INSERT INTO `raiders` (`telegram_id`, `username`) \
+                        VALUES ({0}, '{1}')".format(telegram_id, escape(username, 32))
             cursor.execute(sql)
 
         connection.commit()
