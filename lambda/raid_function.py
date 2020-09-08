@@ -207,7 +207,7 @@ def list_raids():
     
 def format_raider(raider_dict):
     
-    player_str = ''.join([raider_dict.get('username') if not raider_dict.get('nickname') else raider_dict.get('nickname')])
+    player_str = '[{0}](tg://user?id={1})'.format(''.join([raider_dict.get('username') if not raider_dict.get('nickname') else raider_dict.get('nickname')]), raider_dict.get('raider_id'))
     player_str += ''.join(['' if not raider_dict.get('team_id') else ' {0}'.format(raider_dict.get('team_symbol'))])
     player_str += ''.join(['' if not raider_dict.get('level') else ' {0}'.format(str(raider_dict.get('level')))])
     player_str = ''.join(['{0} {1}'.format(player_str, 'with {0} other\(s\)'.format(raider_dict.get('party_count')-1)) if not raider_dict.get('party_count') == 1 else player_str])
@@ -266,7 +266,7 @@ def format_raid_message(raid_dict):
     # IT IS USED TO PARSE CALLBACK RESPONSES TO FIGURE OUT THE RAID ID
     return "*Raid* {0}; *Organiser:* {1}\n*Time and Title:* {2} \- {3}\n*Location:* {4}\n\n{5}\n{6}".format(
                                             raid_dict.get('raid_id'), \
-                                            ''.join([raid_dict.get('raid_creator_username') if not raid_dict.get('raid_creator_nickname') else raid_dict.get('raid_creator_nickname')]),
+                                            '[{0}](tg://user?id={1})'.format(''.join([raid_dict.get('raid_creator_username') if not raid_dict.get('raid_creator_nickname') else raid_dict.get('raid_creator_nickname')]), raid_dict.get('raid_creator_id')),
                                             raid_datetime_string,
                                             raid_dict.get('raid_title'),
                                             raid_dict.get('raid_location'),
