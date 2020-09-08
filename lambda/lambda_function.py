@@ -200,10 +200,16 @@ def bot_command_nickname(command_params, chat_id, from_id, from_username):
     if not re.match('^[A-Za-z0-9]{5,32}$', command_params):
         return send_message('ERROR: Invalid nickname provided. Please try again.', chat_id, None, None)
     
-    if raid.update_nickname(from_id, from_username, command_params):
-        return send_message('Updated your nickname.', chat_id, None, None)
-    else:
-        return send_message('There was a problem updating your nickname. Please try again later.', chat_id, None, None)
+    try:
+        if raid.update_nickname(from_id, from_username, command_params):
+            return send_message('Updated your nickname.', chat_id, None, None)
+    
+    except pymysql.err.IntegrityError as pe:
+        return send_message('Sorry, your nickname has already been claimed.', chat_id, None, None)
+        
+    except Exception as e:
+        send_message('An unhandled error of type {0} has occured: {1}\n\n{2}'.format(type(e), e.args, body), ADMIN_CHAT_ID, None)
+        return send_message('*\[ERROR\]* An unhandled error has occured\. Please try again in a few minutes\.', chat_id, 'MarkdownV2')
 
 # Given a valid raid id number and a chat window:
 # This method will return a formatted message displaying the raid details.

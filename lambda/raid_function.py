@@ -114,10 +114,8 @@ def update_nickname(telegram_id, username, nickname):
             
             return True
         
-        # If there is an error then raise it to the calling function.
-        # It should get handled by the lambda_handler function.
-        #except Exception as e: raise
-            
+        except Exception as e: raise
+        
         finally:
             connection.close()
         
