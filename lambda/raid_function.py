@@ -292,58 +292,60 @@ def format_raid_message(raid_dict):
         raid_datetime_string = raid_dict.get('raid_datetime').strftime("%H:%M")
     else:
         raid_datetime_string = raid_dict.get('raid_datetime').strftime("%d\-%b\-%y\, %H:%M")
-    
-    raid_participant_dict = get_raid_participants_by_id(raid_dict.get('raid_id'))
-    if not raid_participant_dict:
-        participation = 'There are currently no participants for this raid\.'
-    
+        
+    if raid_dict.get('cancelled') == 1:
+        final_string = '❌ RAID CANCELLED ❌'
     else:
+        raid_participant_dict = get_raid_participants_by_id(raid_dict.get('raid_id'))
+        if not raid_participant_dict:
+            participation = 'There are currently no participants for this raid\.'
         
-        physical_count = 0
-        remote_count   = 0
-        invite_count   = 0
-        dropout_count  = 0
-        
-        # Iterate through participants to get their status
-        for p in raid_participant_dict:
+        else:
+            physical_count = 0
+            remote_count   = 0
+            invite_count   = 0
+            dropout_count  = 0
             
-            if p.get('participation_type_id') == 1:
-                physical_str = ''.join(['{0}\n{1}'.format(physical_str, format_raider(p)) if not physical_count == 0 else format_raider(p)])
-                physical_count += p.get('party_count')
+            # Iterate through participants to get their status
+            for p in raid_participant_dict:
                 
-            elif p.get('participation_type_id') == 2:
-                remote_str = ''.join(['{0}\n{1}'.format(remote_str, format_raider(p)) if not remote_count == 0 else format_raider(p)])
-                remote_count += p.get('party_count')
-                
-            elif p.get('participation_type_id') == 3:
-                invite_str = ''.join(['{0}\n{1}'.format(invite_str, format_raider(p)) if not invite_count == 0 else format_raider(p)])
-                invite_count += p.get('party_count')
-                
-            elif p.get('participation_type_id') == 4:
-                dropout_str = ''.join(['{0}\n{1}'.format(dropout_str, format_raider(p)) if not dropout_count == 0 else format_raider(p)])
-                dropout_count += p.get('party_count')
-                
-        participation = ''.join('*{0} Going In Person:*\n{1}\n'.format(physical_count, physical_str) if not physical_count == 0 else '')
-        participation += ''.join('*{0} Joining Remotely:*\n{1}\n'.format(remote_count, remote_str) if not remote_count == 0 else '')
-        participation += ''.join('*{0} Requesting an Invite:*\n{1}\n'.format(invite_count, invite_str) if not invite_count == 0 else '')
-        participation += ''.join('*Dropped Out:*\n{0}\n'.format(dropout_str) if not dropout_count == 0 else '')
-        
-    raid_comments_dict = get_raid_comments_by_id(raid_dict.get('raid_id'))
-    comments = ''
-    if raid_comments_dict:
-        for c in raid_comments_dict:
-            comments += '{0}: _{1}_\n'.format(c['username'], c['comment'])
+                if p.get('participation_type_id') == 1:
+                    physical_str = ''.join(['{0}\n{1}'.format(physical_str, format_raider(p)) if not physical_count == 0 else format_raider(p)])
+                    physical_count += p.get('party_count')
+                    
+                elif p.get('participation_type_id') == 2:
+                    remote_str = ''.join(['{0}\n{1}'.format(remote_str, format_raider(p)) if not remote_count == 0 else format_raider(p)])
+                    remote_count += p.get('party_count')
+                    
+                elif p.get('participation_type_id') == 3:
+                    invite_str = ''.join(['{0}\n{1}'.format(invite_str, format_raider(p)) if not invite_count == 0 else format_raider(p)])
+                    invite_count += p.get('party_count')
+                    
+                elif p.get('participation_type_id') == 4:
+                    dropout_str = ''.join(['{0}\n{1}'.format(dropout_str, format_raider(p)) if not dropout_count == 0 else format_raider(p)])
+                    dropout_count += p.get('party_count')
+                    
+            participation = ''.join('*{0} Going In Person:*\n{1}\n'.format(physical_count, physical_str) if not physical_count == 0 else '')
+            participation += ''.join('*{0} Joining Remotely:*\n{1}\n'.format(remote_count, remote_str) if not remote_count == 0 else '')
+            participation += ''.join('*{0} Requesting an Invite:*\n{1}\n'.format(invite_count, invite_str) if not invite_count == 0 else '')
+            participation += ''.join('*Dropped Out:*\n{0}\n'.format(dropout_str) if not dropout_count == 0 else '')
+            
+        raid_comments_dict = get_raid_comments_by_id(raid_dict.get('raid_id'))
+        comments = ''
+        if raid_comments_dict:
+            for c in raid_comments_dict:
+                comments += '{0}: _{1}_\n'.format(c['username'], c['comment'])
+        final_string = '{0}\n{1}'.format(participation, comments)
     
     # IT IS VERY IMPORTANT THAT THE MESSAGE STARTS WITH 'Raid {raid_id};'
     # IT IS USED TO PARSE CALLBACK RESPONSES TO FIGURE OUT THE RAID ID
-    return "*Raid* {0}; *Organiser:* {1}\n*Time and Title:* {2} \- {3}\n*Location:* {4}\n\n{5}\n{6}".format(
+    return "*Raid* {0}; *Organiser:* {1}\n*Time and Title:* {2} \- {3}\n*Location:* {4}\n\n{5}".format(
                                             raid_dict.get('raid_id'), \
                                             '[{0}](tg://user?id={1})'.format(''.join([raid_dict.get('raid_creator_username') if not raid_dict.get('raid_creator_nickname') else raid_dict.get('raid_creator_nickname')]), raid_dict.get('raid_creator_id')),
                                             raid_datetime_string,
                                             raid_dict.get('raid_title'),
                                             raid_dict.get('raid_location'),
-                                            participation,
-                                            comments
+                                            final_string
                                         )
 
 def insert_message_tracking(raid_id, chat_id, message_id):

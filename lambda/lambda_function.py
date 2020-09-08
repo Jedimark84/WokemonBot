@@ -261,7 +261,7 @@ def send_message(text, chat_id, parse_mode=None, send_keyboard=None):
     
     url = URL + "sendMessage?text={0}&chat_id={1}&parse_mode={2}".format(text, chat_id, parse_mode)
     
-    if send_keyboard:
+    if send_keyboard and not 'RAID CANCELLED' in text:
         url += '&reply_markup={"inline_keyboard":[[ {"text":"✅️","callback_data":1},  \
                                                     {"text":"📍","callback_data":2},  \
                                                     {"text":"📩","callback_data":3},  \
@@ -290,7 +290,7 @@ def edit_message(chat_id, message_id, text, parse_mode=None, send_keyboard=None)
     
     url = URL + "editMessageText?chat_id={0}&message_id={1}&text={2}&parse_mode={3}".format(chat_id, message_id, text, parse_mode)
     
-    if send_keyboard:
+    if send_keyboard and not 'RAID CANCELLED' in text:
         url += '&reply_markup={"inline_keyboard":[[ {"text":"✅️","callback_data":1},  \
                                                     {"text":"📍","callback_data":2},  \
                                                     {"text":"📩","callback_data":3},  \
