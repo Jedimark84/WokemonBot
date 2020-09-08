@@ -92,7 +92,35 @@ def determine_raid_time(input):
         return find_time[0]
     else:
         return False
+
+def update_level(telegram_id, username, level):
     
+    # Step 1: Verify the user exists in the raiders table
+    #.        If they don't then create them!
+    if not get_raider_by_id(telegram_id):
+        insert_raider(telegram_id, username)
+    else:
+        
+        # Connect to the database
+        connection = db.connect()
+        
+        try:
+            with connection.cursor() as cursor:
+                # Update an existing record
+                sql = "UPDATE `raiders` SET `level` = {0} WHERE (`telegram_id` = {1})".format(level, telegram_id)
+                cursor.execute(sql)
+    
+            connection.commit()
+            
+            return True
+        
+        except Exception as e: raise
+        
+        finally:
+            connection.close()
+        
+    return False
+
 def update_nickname(telegram_id, username, nickname):
     
     # Step 1: Verify the user exists in the raiders table

@@ -82,6 +82,9 @@ def lambda_handler(event, context):
                     elif bot_command == '/nickname':
                         bot_command_nickname(bot_command_params, chat_id, from_id, from_username)
                         
+                    elif bot_command == '/level':
+                        bot_command_level(bot_command_params, chat_id, from_id, from_username)
+                        
                     elif bot_command == '/listraids':
                         bot_command_listraids(chat_id)
                         
@@ -194,6 +197,21 @@ def bot_command_listraids(chat_id):
     else:
         for r in raid_list:
             send_message(raid.format_raid_message(r), chat_id, 'MarkdownV2')
+
+def bot_command_level(command_params, chat_id, from_id, from_username):
+    
+    if not str(command_params).isdigit():
+        return send_message('ERROR: Invalid level provided. Please try again.', chat_id, None, None)
+    else:
+        level = int(command_params)
+        if not 1 <= level <= 40:
+            return send_message('ERROR: Level must be between 1 and 40.', chat_id, None, None)
+    
+        try:
+            if raid.update_level(from_id, from_username, level):
+                return send_message('Updated your level.', chat_id, None, None)
+        
+        except Exception as e: raise
             
 def bot_command_nickname(command_params, chat_id, from_id, from_username):
     
@@ -207,9 +225,7 @@ def bot_command_nickname(command_params, chat_id, from_id, from_username):
     except pymysql.err.IntegrityError as pe:
         return send_message('Sorry, your nickname has already been claimed.', chat_id, None, None)
         
-    except Exception as e:
-        send_message('An unhandled error of type {0} has occured: {1}\n\n{2}'.format(type(e), e.args, body), ADMIN_CHAT_ID, None)
-        return send_message('*\[ERROR\]* An unhandled error has occured\. Please try again in a few minutes\.', chat_id, 'MarkdownV2')
+    except Exception as e: raise
 
 # Given a valid raid id number and a chat window:
 # This method will return a formatted message displaying the raid details.
