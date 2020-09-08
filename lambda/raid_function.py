@@ -208,6 +208,8 @@ def list_raids():
 def format_raider(raider_dict):
     
     player_str = ''.join([raider_dict.get('username') if not raider_dict.get('nickname') else raider_dict.get('nickname')])
+    player_str += ''.join(['' if not raider_dict.get('team_id') else ' {0}'.format(raider_dict.get('team_symbol'))])
+    player_str += ''.join(['' if not raider_dict.get('level') else ' {0}'.format(str(raider_dict.get('level')))])
     player_str = ''.join(['{0} {1}'.format(player_str, 'with {0} other\(s\)'.format(raider_dict.get('party_count')-1)) if not raider_dict.get('party_count') == 1 else player_str])
     
     return player_str
@@ -461,8 +463,12 @@ def join_raid(from_object, raid_id, participation_type_id):
             return False
         
         # ... if they aren't a drop out, they can bring a plus 1?
+        # ... However, if they are bringing a plus one into the remote lobby, then check there is space
         elif participation_type_id == '0' and not p['participation_type_id'] == 4:
-            return update_raid_with_a_plus_one(raid_id, from_object['id'], participation_type_id)
+            if remote_count >= 10:
+                return False
+            else:
+                return update_raid_with_a_plus_one(raid_id, from_object['id'], participation_type_id)
         
         # ... else they must be changing their participation type
         else:
