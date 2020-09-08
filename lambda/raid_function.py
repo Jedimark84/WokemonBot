@@ -93,31 +93,60 @@ def determine_raid_time(input):
     else:
         return False
 
+def update_team(telegram_id, username, team):
+    
+    # Step 1: Verify the user exists in the raiders table
+    #.        If they don't then create them!
+    if not get_raider_by_id(telegram_id):
+        insert_raider(telegram_id, username)
+        
+    team_dict = get_team_by_name(team)
+    if team_dict:
+        
+        # Connect to the database
+        connection = db.connect()
+            
+        try:
+            with connection.cursor() as cursor:
+                # Update an existing record
+                sql = "UPDATE `raiders` SET `team_id` = {0} WHERE (`telegram_id` = {1})".format(team_dict['team_id'], telegram_id)
+                cursor.execute(sql)
+        
+            connection.commit()
+                
+            return True
+            
+        except Exception as e: raise
+            
+        finally:
+            connection.close()
+        
+    return False
+
 def update_level(telegram_id, username, level):
     
     # Step 1: Verify the user exists in the raiders table
     #.        If they don't then create them!
     if not get_raider_by_id(telegram_id):
         insert_raider(telegram_id, username)
-    else:
         
-        # Connect to the database
-        connection = db.connect()
+    # Connect to the database
+    connection = db.connect()
         
-        try:
-            with connection.cursor() as cursor:
-                # Update an existing record
-                sql = "UPDATE `raiders` SET `level` = {0} WHERE (`telegram_id` = {1})".format(level, telegram_id)
-                cursor.execute(sql)
+    try:
+        with connection.cursor() as cursor:
+            # Update an existing record
+            sql = "UPDATE `raiders` SET `level` = {0} WHERE (`telegram_id` = {1})".format(level, telegram_id)
+            cursor.execute(sql)
     
-            connection.commit()
+        connection.commit()
             
-            return True
+        return True
         
-        except Exception as e: raise
+    except Exception as e: raise
         
-        finally:
-            connection.close()
+    finally:
+        connection.close()
         
     return False
 
@@ -195,6 +224,21 @@ def get_raid_by_id(raid_id):
     try:
         with connection.cursor() as cursor:
             sql = "SELECT * FROM `vw_raids` WHERE `raid_id` = {0}".format(raid_id)
+            cursor.execute(sql)
+            result = cursor.fetchone()
+
+    finally:
+        connection.close()
+        
+    return result
+    
+def get_team_by_name(team):
+    
+    connection = db.connect()
+    
+    try:
+        with connection.cursor() as cursor:
+            sql = "SELECT * FROM `teams` WHERE `team_name` LIKE '{0}'".format(team)
             cursor.execute(sql)
             result = cursor.fetchone()
 

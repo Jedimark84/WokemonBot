@@ -85,6 +85,9 @@ def lambda_handler(event, context):
                     elif bot_command == '/level':
                         bot_command_level(bot_command_params, chat_id, from_id, from_username)
                         
+                    elif bot_command == '/team':
+                        bot_command_team(bot_command_params, chat_id, from_id, from_username)
+                        
                     elif bot_command == '/listraids':
                         bot_command_listraids(chat_id)
                         
@@ -225,6 +228,17 @@ def bot_command_nickname(command_params, chat_id, from_id, from_username):
     except pymysql.err.IntegrityError as pe:
         return send_message('Sorry, your nickname has already been claimed.', chat_id, None, None)
         
+    except Exception as e: raise
+
+def bot_command_team(command_params, chat_id, from_id, from_username):
+    
+    if not re.match('^valor|mystic|instinct$', command_params, re.IGNORECASE):
+        return send_message('ERROR: Invalid team name provided. Please specify either Valor, Mystic or Instinct.', chat_id, None, None)
+    
+    try:
+        if raid.update_team(from_id, from_username, command_params):
+            return send_message('Updated your team.', chat_id, None, None)
+    
     except Exception as e: raise
 
 # Given a valid raid id number and a chat window:
