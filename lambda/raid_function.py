@@ -348,6 +348,37 @@ def format_raid_message(raid_dict):
                                             final_string
                                         )
 
+def cancel_raid(raid_id, from_id):
+    
+    raid_dict = get_raid_by_id(raid_id)
+    if not raid_dict:
+        return { "error": "Could not find a raid with that id." }
+    else:
+        if not raid_dict.get('raid_creator_id') == int(from_id):
+            return { "error": "Only the raid creator can cancel the raid." }
+        else:
+            # Connect to the database
+            connection = db.connect()
+            
+            try:
+                with connection.cursor() as cursor:
+                    # Update an existing record
+                    sql = "UPDATE `raids` SET `cancelled` = 1 WHERE `raid_id` = {0}".format(raid_id)
+                    cursor.execute(sql)
+        
+                connection.commit()
+                
+                return { "success": "Raid Cancelled." }
+            
+            # If there is an error then raise it to the calling function.
+            # It should get handled by the lambda_handler function.
+            #except Exception as e: raise
+                
+            finally:
+                connection.close()
+                
+    return { "error": "There was a problem cancelling the raid. Please try again later." }
+
 def insert_message_tracking(raid_id, chat_id, message_id):
     
     # Connect to the database
@@ -518,7 +549,7 @@ def join_raid(from_object, raid_id, participation_type_id):
                     return False
         
     # There is space available in the raid!
-        
+    
     # Step 3: See if the user is already participating in this raid
     p = get_raid_participation_by_id(raid_id, from_object['id'])
     
@@ -539,8 +570,9 @@ def join_raid(from_object, raid_id, participation_type_id):
         # ... if they aren't a drop out, they can bring a plus 1?
         # ... However, if they are bringing a plus one into the remote lobby, then check there is space
         elif participation_type_id == '0' and not p['participation_type_id'] == 4:
-            if remote_count >= 10:
-                return False
+            if participation_type_id == '2' or participation_type_id == '3':
+                if remote_count >= 10:
+                    return False
             else:
                 return update_raid_with_a_plus_one(raid_id, from_object['id'], participation_type_id)
         

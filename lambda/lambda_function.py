@@ -119,6 +119,7 @@ def reply_to_message_handler(message):
     message_id = message['message_id']
     quoted_message_text = message['reply_to_message']['text']
     reply_text = message['text']
+    chat_id = message['chat']['id']
     
     text_split = quoted_message_text.split(';')[0]
         
@@ -127,12 +128,24 @@ def reply_to_message_handler(message):
         
         from_obj = message['from']
         from_id = from_obj['id']
-                    
+        
         # Some people haven't set a username, so use first_name instead
         if 'username' in from_obj:
             from_username = from_obj['username']
         else:
             from_username = from_obj['first_name']
+        
+        if reply_text == '/cancel':
+            response = raid.cancel_raid(raid_id, from_id)
+            
+            if response.get('success'):
+                formatted_message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
+                tracking = raid.get_message_tracking_by_id(raid_id)
+                for t in tracking:
+                    edit_message(t.get('chat_id'),t.get('message_id'),formatted_message,'MarkdownV2', True)
+                return send_message('Raid Cancelled.', chat_id, None)
+            else:
+                return send_message('ERROR: {0}'.format(response.get('error')), chat_id, None)
         
         if raid.insert_raid_comment(reply_text, from_username, raid_id, message_id):
             formatted_message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
