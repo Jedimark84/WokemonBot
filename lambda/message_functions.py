@@ -3,8 +3,7 @@ import os
 
 TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
 API_URL        = "https://api.telegram.org/bot{0}/".format(TELEGRAM_TOKEN)
-
-RAID_KEYBOARD = '&reply_markup={"inline_keyboard":[[ {"text":"✅️","callback_data":1},  \
+RAID_KEYBOARD  = '&reply_markup={"inline_keyboard":[[ {"text":"✅️","callback_data":1},  \
                                                      {"text":"📍","callback_data":2},  \
                                                      {"text":"📩","callback_data":3},  \
                                                      {"text":"🚫","callback_data":4},  \
@@ -32,11 +31,7 @@ def edit_message(chat_id, message_id, text, parse_mode=None, send_keyboard=None)
     url = ''.join([url, '' if not parse_mode else '&parse_mode={0}'.format(parse_mode)])
     
     if send_keyboard and not 'RAID CANCELLED' in text:
-        url += '&reply_markup={"inline_keyboard":[[ {"text":"✅️","callback_data":1},  \
-                                                    {"text":"📍","callback_data":2},  \
-                                                    {"text":"📩","callback_data":3},  \
-                                                    {"text":"🚫","callback_data":4},  \
-                                                    {"text":"➕","callback_data":0}]]}'
+        url += RAID_KEYBOARD
     
     http = urllib3.PoolManager()
     resp = http.request('GET', url)
