@@ -17,7 +17,7 @@ CREATE TABLE `raid_comments` (
   `comment_id` int NOT NULL,
   `raid_id` int NOT NULL,
   `username` varchar(96) NOT NULL,
-  `comment` varchar(150) NOT NULL,
+  `comment` varchar(600) NOT NULL,
   `created` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`comment_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -30,7 +30,9 @@ CREATE TABLE `raiders` (
   `team_id` int DEFAULT NULL,
   `created` datetime DEFAULT CURRENT_TIMESTAMP,
   `modified` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`telegram_id`)
+  PRIMARY KEY (`telegram_id`),
+  UNIQUE KEY `username_UNIQUE` (`username`),
+  UNIQUE KEY `nickname_UNIQUE` (`nickname`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `raid_participants` (
@@ -49,10 +51,11 @@ CREATE TABLE `raids` (
   `raid_datetime` datetime NOT NULL,
   `raid_title` varchar(150) NOT NULL,
   `raid_location` varchar(150) NOT NULL,
-  `created` datetime DEFAULT CURRENT_TIMESTAMP,
+  `created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `modified` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `cancelled` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`raid_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `teams` (
   `team_id` int NOT NULL,
@@ -76,6 +79,7 @@ VIEW `vw_raiders` AS
         `teams`.`team_name` AS `team_name`,
         `teams`.`team_symbol` AS `team_symbol`,
         `raid_participants`.`participation_type_id` AS `participation_type_id`,
+        `raid_participants`.`created` AS `participation_date`,
         `participation_types`.`participation_type` AS `participation_type`,
         `raid_participants`.`party_count` AS `party_count`
     FROM
@@ -83,6 +87,7 @@ VIEW `vw_raiders` AS
         JOIN `raiders` ON ((`raid_participants`.`raider_id` = `raiders`.`telegram_id`)))
         JOIN `participation_types` ON ((`raid_participants`.`participation_type_id` = `participation_types`.`participation_type_id`)))
         LEFT JOIN `teams` ON ((`raiders`.`team_id` = `teams`.`team_id`)))
+    ORDER BY `raid_participants`.`participation_type_id` , `raid_participants`.`created`;
 
 CREATE 
     ALGORITHM = UNDEFINED 
@@ -95,8 +100,9 @@ VIEW `vw_raids` AS
         `raids`.`raid_datetime` AS `raid_datetime`,
         `raids`.`raid_title` AS `raid_title`,
         `raids`.`raid_location` AS `raid_location`,
+        `raids`.`cancelled` AS `cancelled`,
         `raiders`.`username` AS `raid_creator_username`,
         `raiders`.`nickname` AS `raid_creator_nickname`
     FROM
         (`raids`
-        JOIN `raiders` ON ((`raiders`.`telegram_id` = `raids`.`raid_creator_id`)))
+        JOIN `raiders` ON ((`raiders`.`telegram_id` = `raids`.`raid_creator_id`)));
