@@ -1,7 +1,6 @@
 import json
 import os
 import re
-import urllib3
 
 import message_functions as msg
 import raid_function as raid
