@@ -147,6 +147,22 @@ def reply_to_message_handler(message):
             else:
                 return send_message('ERROR: {0}'.format(response.get('error')), chat_id, None)
         
+        if reply_text.startswith('/time'):
+            if not re.match('^/time\s([01]?[0-9]|2[0-3]):[0-5][0-9]$', reply_text):
+                return send_message('ERROR: Please supply the time in the format: hh:mm', chat_id, None)
+            else:
+                time = reply_text.replace('/time', '').strip()
+                response = raid.change_raid_time(raid_id, from_id, time)
+                if response.get('success'):
+                    raid.insert_raid_comment('Changed the raid time to {0}'.format(time), from_username, raid_id, message_id)
+                    formatted_message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
+                    tracking = raid.get_message_tracking_by_id(raid_id)
+                    for t in tracking:
+                        edit_message(t.get('chat_id'),t.get('message_id'),formatted_message,'MarkdownV2', True)
+                    return send_message('Raid time has been changed.', chat_id, None)
+                else:
+                    return send_message('ERROR: {0}'.format(response.get('error')), chat_id, None)
+        
         if raid.insert_raid_comment(reply_text, from_username, raid_id, message_id):
             formatted_message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
             tracking = raid.get_message_tracking_by_id(raid_id)

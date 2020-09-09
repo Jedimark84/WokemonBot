@@ -669,3 +669,47 @@ def get_raid_comments_by_id(raid_id):
         connection.close()
     
     return result
+
+def change_raid_time(raid_id, from_id, time):
+    
+    raid_dict = get_raid_by_id(raid_id)
+    if not raid_dict:
+        return { "error": "Could not find a raid with that id." }
+    else:
+        if not raid_dict.get('raid_creator_id') == int(from_id):
+            return { "error": "Only the raid creator can perform this action." }
+        else:
+            # Verify the time is acceptable, not in the past
+            current_datetime = raid_dict.get('raid_datetime')
+            new_datetime = raid_dict.get('raid_datetime').replace(
+                hour=int(time.split(':')[0]),
+                minute=int(time.split(':')[1]),
+                second=0,
+                microsecond=0
+            )
+            if new_datetime < datetime.now():
+                return { "error": "You cannot schedule a raid for the past." }
+            else:
+                
+                # Connect to the database
+                connection = db.connect()
+                
+                try:
+                    
+                    with connection.cursor() as cursor:
+                        # Update an existing record
+                        sql = "UPDATE `raids` SET `raid_datetime` = '{0}' WHERE `raid_id` = {1}".format(new_datetime.strftime("%Y/%m/%d, %H:%M:%S"), raid_id)
+                        cursor.execute(sql)
+                    
+                    connection.commit()
+                    
+                    return { "success": "Raid time changed." }
+                    
+                # If there is an error then raise it to the calling function.
+                # It should get handled by the lambda_handler function.
+                except Exception as e: raise
+                
+                finally:
+                    connection.close()
+    
+    return { "error": "There was a problem changing the raid time. Please try again later." }
