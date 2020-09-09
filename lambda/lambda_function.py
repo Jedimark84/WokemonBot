@@ -92,9 +92,10 @@ def lambda_handler(event, context):
                     #    bot_command_listraids(chat_id)
                     
                     else:
-                        send_message('Unsupported Bot Command: {0}\nParams: {1}'.format(bot_command, bot_command_params), chat_id)
-                else:
-                    send_message('{0}'.format(message), chat_id)
+                        return
+                    #    send_message('Unsupported Bot Command: {0}\nParams: {1}'.format(bot_command, bot_command_params), chat_id)
+                #else:
+                #    send_message('{0}'.format(message), chat_id)
                 
                 return
         
