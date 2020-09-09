@@ -177,7 +177,7 @@ def update_nickname(telegram_id, username, nickname):
             connection.close()
         
     return False
-        
+
 def insert_raid(raid_dict):
     
     # Step 1: Verify the user exists in the raiders table
@@ -618,7 +618,7 @@ def insert_raid_comment(comment, username, raid_id, comment_id):
         with connection.cursor() as cursor:
             # Create a new record
             sql = "INSERT INTO `raid_comments` (`comment_id`, `raid_id`, `username`, `comment`) \
-                    VALUES ({0}, {1}, '{2}', '{3}')".format(comment_id, raid_id, escape(username, 32), escape(comment, 50))
+                    VALUES ({0}, {1}, '{2}', '{3}')".format(comment_id, raid_id, escape(username, 32), escape(comment, 100))
             cursor.execute(sql)
         
         connection.commit()
@@ -713,3 +713,67 @@ def change_raid_time(raid_id, from_id, time):
                     connection.close()
     
     return { "error": "There was a problem changing the raid time. Please try again later." }
+
+def change_raid_title(raid_id, from_id, title):
+    
+    raid_dict = get_raid_by_id(raid_id)
+    if not raid_dict:
+        return { "error": "Could not find a raid with that id." }
+    else:
+        if not raid_dict.get('raid_creator_id') == int(from_id):
+            return { "error": "Only the raid creator can perform this action." }
+        else:
+            
+            # Connect to the database
+            connection = db.connect()
+            
+            try:
+                with connection.cursor() as cursor:
+                    # Update an existing record
+                    sql = "UPDATE `raids` SET `raid_title` = '{0}' WHERE `raid_id` = {1}".format(escape(title, 50), raid_id)
+                    cursor.execute(sql)
+                
+                connection.commit()
+                
+                return { "success": "Raid title changed." }
+                
+            # If there is an error then raise it to the calling function.
+            # It should get handled by the lambda_handler function.
+            except Exception as e: raise
+            
+            finally:
+                connection.close()
+    
+    return { "error": "There was a problem changing the raid title. Please try again later." }
+
+def change_raid_location(raid_id, from_id, location):
+    
+    raid_dict = get_raid_by_id(raid_id)
+    if not raid_dict:
+        return { "error": "Could not find a raid with that id." }
+    else:
+        if not raid_dict.get('raid_creator_id') == int(from_id):
+            return { "error": "Only the raid creator can perform this action." }
+        else:
+            
+            # Connect to the database
+            connection = db.connect()
+            
+            try:
+                with connection.cursor() as cursor:
+                    # Update an existing record
+                    sql = "UPDATE `raids` SET `raid_location` = '{0}' WHERE `raid_id` = {1}".format(escape(location, 50), raid_id)
+                    cursor.execute(sql)
+                
+                connection.commit()
+                
+                return { "success": "Raid location changed." }
+                
+            # If there is an error then raise it to the calling function.
+            # It should get handled by the lambda_handler function.
+            except Exception as e: raise
+            
+            finally:
+                connection.close()
+    
+    return { "error": "There was a problem changing the raid location. Please try again later." }

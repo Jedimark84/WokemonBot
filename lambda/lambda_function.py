@@ -163,7 +163,33 @@ def reply_to_message_handler(message):
                 else:
                     return send_message('ERROR: {0}'.format(response.get('error')), chat_id, None)
         
-        if raid.insert_raid_comment(reply_text, from_username, raid_id, message_id):
+        if reply_text.startswith('/title'):
+            title = reply_text.replace('/title','').strip()[:50].strip()
+            response = raid.change_raid_title(raid_id, from_id, title)
+            if response.get('success'):
+                raid.insert_raid_comment('Changed the raid title to {0}'.format(title), from_username, raid_id, message_id)
+                formatted_message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
+                tracking = raid.get_message_tracking_by_id(raid_id)
+                for t in tracking:
+                    edit_message(t.get('chat_id'),t.get('message_id'),formatted_message,'MarkdownV2', True)
+                return send_message('Raid title has been changed.', chat_id, None)
+            else:
+                return send_message('ERROR: {0}'.format(response.get('error')), chat_id, None)
+        
+        if reply_text.startswith('/location'):
+            location = reply_text.replace('/location','').strip()[:50].strip()
+            response = raid.change_raid_location(raid_id, from_id, location)
+            if response.get('success'):
+                raid.insert_raid_comment('Changed the raid location to {0}'.format(location), from_username, raid_id, message_id)
+                formatted_message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
+                tracking = raid.get_message_tracking_by_id(raid_id)
+                for t in tracking:
+                    edit_message(t.get('chat_id'),t.get('message_id'),formatted_message,'MarkdownV2', True)
+                return send_message('Raid location has been changed.', chat_id, None)
+            else:
+                return send_message('ERROR: {0}'.format(response.get('error')), chat_id, None)        
+        
+        if raid.insert_raid_comment(reply_text.strip()[:50].strip(), from_username, raid_id, message_id):
             formatted_message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
             tracking = raid.get_message_tracking_by_id(raid_id)
             for t in tracking:
