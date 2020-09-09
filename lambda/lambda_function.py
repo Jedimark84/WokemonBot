@@ -4,7 +4,7 @@ import re
 
 import message_functions as msg
 import raid_function as raid
-import database_connection as db
+
 
 from datetime import datetime
 
