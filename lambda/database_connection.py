@@ -17,5 +17,6 @@ def connect():
                                  password=DB_PASSWORD,
                                  db=DB_SCHEMA,
                                  charset='utf8mb4',
-                                 cursorclass=pymysql.cursors.DictCursor)
+                                 cursorclass=pymysql.cursors.DictCursor,
+                                 init_command="SET SESSION time_zone='Europe/London';")
     return connection

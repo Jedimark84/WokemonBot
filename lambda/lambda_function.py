@@ -4,6 +4,7 @@ import re
 
 import message_functions as msg
 import raid_function as raid
+import channel_post as chnl
 
 
 from datetime import datetime
@@ -23,11 +24,16 @@ def lambda_handler(event, context):
     try:
         body = json.loads(event['body'])
         
-        #msg.send_message('ADMIN TRACKING: {0}'.format(body), 581975002)
+        msg.send_message('ADMIN TRACKING: {0}'.format(body), 581975002)
         
         if 'callback_query' in body:
             callback_query = body['callback_query']
             callback_query_handler(callback_query)
+            return
+        
+        if 'channel_post' in body:
+            channel_post = body['channel_post']
+            chnl.channel_post_handler(channel_post)
             return
         
         if 'message' in body:

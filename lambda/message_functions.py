@@ -1,4 +1,5 @@
 import urllib3
+import json
 import os
 
 TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
@@ -41,3 +42,8 @@ def http_get(url: str) -> urllib3.HTTPResponse:
     
     http = urllib3.PoolManager()
     return http.request('GET', url)
+
+# Decode a HTTPResponse and return as a dict
+def decode_http_response_as_dict(http_response: urllib3.HTTPResponse) -> dict():
+    
+    return json.loads(http_response.data.decode("utf-8"))
