@@ -65,9 +65,7 @@ CREATE TABLE `teams` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE 
-    ALGORITHM = UNDEFINED 
-    DEFINER = `admin`@`%` 
-    SQL SECURITY DEFINER
+    ALGORITHM = UNDEFINED
 VIEW `vw_raiders` AS
     SELECT 
         `raid_participants`.`raid_id` AS `raid_id`,
@@ -90,9 +88,7 @@ VIEW `vw_raiders` AS
     ORDER BY `raid_participants`.`participation_type_id` , `raid_participants`.`created`;
 
 CREATE 
-    ALGORITHM = UNDEFINED 
-    DEFINER = `admin`@`%` 
-    SQL SECURITY DEFINER
+    ALGORITHM = UNDEFINED
 VIEW `vw_raids` AS
     SELECT 
         `raids`.`raid_id` AS `raid_id`,
@@ -106,3 +102,6 @@ VIEW `vw_raids` AS
     FROM
         (`raids`
         JOIN `raiders` ON ((`raiders`.`telegram_id` = `raids`.`raid_creator_id`)));
+
+-- Required inserts
+INSERT IGNORE INTO participation_types(participation_type_id, participation_type, participation_max) VALUES (1,'In Person',20),(2,'Remote',10),(3,'By Invite',5),(4,'Drop Out',-1);
