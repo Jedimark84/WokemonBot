@@ -65,10 +65,7 @@ def lambda_handler(event, context):
                     from_id = from_obj['id']
                     
                     # Some people haven't set a username, so use first_name instead
-                    if 'username' in from_obj:
-                        from_username = from_obj['username']
-                    else:
-                        from_username = from_obj['first_name']
+                    from_username = raid.get_username(from_obj)
                 else:
                     msg.send_message('Received a message with no from: {0}'.format(body), ADMIN_CHAT_ID)
                     return
@@ -120,6 +117,9 @@ def lambda_handler(event, context):
             'body': json.dumps('Success.')
         }
 
+
+
+
 def reply_to_message_handler(message):
     
     message_id = message['message_id']
@@ -136,10 +136,7 @@ def reply_to_message_handler(message):
         from_id = from_obj['id']
         
         # Some people haven't set a username, so use first_name instead
-        if 'username' in from_obj:
-            from_username = from_obj['username']
-        else:
-            from_username = from_obj['first_name']
+        raid.get_username(from_obj)
         
         if reply_text == '/cancel':
             response = raid.cancel_raid(raid_id, from_id)

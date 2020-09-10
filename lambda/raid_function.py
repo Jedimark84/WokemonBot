@@ -520,8 +520,7 @@ def join_raid(from_object, raid_id, participation_type_id):
     # Step 1: Verify the user exists in the raiders table
     #         If they don't then create them!
     if not get_raider_by_id(from_object['id']):
-        # TODO: I think users can exist without a username
-        insert_raider(from_object['id'], from_object['username'])
+        insert_raider(from_object['id'], get_username(from_object))
     
     # Step 2: If this is not a drop out request, is there space in the raid for another user?
     if int(participation_type_id) < 4:
@@ -777,3 +776,14 @@ def change_raid_location(raid_id, from_id, location):
                 connection.close()
     
     return { "error": "There was a problem changing the raid location. Please try again later." }
+
+
+def get_username(input_json):
+    # Some people haven't set a username, so use first_name instead
+    if 'username' in input_json:
+        from_username = input_json['username']
+    else:
+        from_username = input_json['first_name']
+
+    return from_username
+
