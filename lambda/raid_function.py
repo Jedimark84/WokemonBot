@@ -3,6 +3,39 @@ from datetime import datetime
 from datetime import date
 import database as db
 
+def get_raid_by_id(raid_id: int):
+    return db.select_by_id('vw_raids', { 'raid_id': raid_id }, False)
+
+def get_raid_participants_by_id(raid_id: int):
+    return db.select_by_id('vw_raiders', { 'raid_id': raid_id }, True)
+
+def get_message_tracking_by_id(raid_id: int):
+    return db.select_by_id('message_tracking', { 'raid_id': raid_id }, True)
+
+def get_raid_comments_by_id(raid_id: int):
+    return db.select_by_id('raid_comments', { 'raid_id': raid_id }, True)
+
+def get_raider_by_id(telegram_id: int):
+    return db.select_by_id('raiders', { 'telegram_id': telegram_id }, False)
+
+def get_raid_participation_by_id(raid_id: int, raider_id: int):
+    return db.select_by_id('raid_participants', { 'raid_id': raid_id, 'raider_id': raider_id }, False)
+
+def get_team_by_name(team: str):
+    
+    connection = db.connect()
+    
+    try:
+        with connection.cursor() as cursor:
+            sql = "SELECT * FROM `teams` WHERE `team_name` LIKE '{0}'".format(team)
+            cursor.execute(sql)
+            result = cursor.fetchone()
+    
+    finally:
+        connection.close()
+    
+    return result
+
 def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
     
     # Stage 1: Validate Raid Params.
@@ -217,51 +250,6 @@ def insert_raid(raid_dict):
     
     return result
 
-def get_raid_by_id(raid_id):
-    
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            sql = "SELECT * FROM `vw_raids` WHERE `raid_id` = {0}".format(raid_id)
-            cursor.execute(sql)
-            result = cursor.fetchone()
-    
-    finally:
-        connection.close()
-    
-    return result
-
-def get_team_by_name(team):
-    
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            sql = "SELECT * FROM `teams` WHERE `team_name` LIKE '{0}'".format(team)
-            cursor.execute(sql)
-            result = cursor.fetchone()
-    
-    finally:
-        connection.close()
-    
-    return result
-
-def get_raid_participants_by_id(raid_id):
-    
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            sql = "SELECT * FROM `vw_raiders` WHERE `raid_id` = {0}".format(raid_id)
-            cursor.execute(sql)
-            result = cursor.fetchall()
-    
-    finally:
-        connection.close()
-    
-    return result
-
 def list_raids():
     
     connection = db.connect()
@@ -399,51 +387,6 @@ def insert_message_tracking(raid_id, chat_id, message_id):
     
     finally:
         connection.close()
-
-def get_message_tracking_by_id(raid_id):
-    
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            sql = "SELECT * FROM `message_tracking` WHERE `raid_id` = {0}".format(raid_id)
-            cursor.execute(sql)
-            result = cursor.fetchall()
-    
-    finally:
-        connection.close()
-    
-    return result
-
-def get_raid_participation_by_id(raid_id, raider_id):
-    
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            sql = "SELECT * FROM `raid_participants` WHERE `raid_id` = {0} AND `raider_id` = {1}".format(raid_id, raider_id)
-            cursor.execute(sql)
-            result = cursor.fetchone()
-    
-    finally:
-        connection.close()
-    
-    return result
-
-def get_raider_by_id(id):
-    
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            sql = "SELECT * FROM `raiders` WHERE `telegram_id` = {0}".format(id)
-            cursor.execute(sql)
-            result = cursor.fetchall()
-    
-    finally:
-        connection.close()
-    
-    return result
 
 def update_raid_participation(raid_id, raider_id, participation_type_id):
     
@@ -654,21 +597,6 @@ def escape(input, max_length):
                                             "!": r"\\!"
                                         })).strip()
 
-def get_raid_comments_by_id(raid_id):
-    
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            sql = "SELECT * FROM `raid_comments` WHERE `raid_id` = {0}".format(raid_id)
-            cursor.execute(sql)
-            result = cursor.fetchall()
-    
-    finally:
-        connection.close()
-    
-    return result
-
 def change_raid_time(raid_id, from_id, time):
     
     raid_dict = get_raid_by_id(raid_id)
@@ -777,7 +705,6 @@ def change_raid_location(raid_id, from_id, location):
     
     return { "error": "There was a problem changing the raid location. Please try again later." }
 
-
 def get_username(input_json):
     # Some people haven't set a username, so use first_name instead
     if 'username' in input_json:
@@ -786,4 +713,3 @@ def get_username(input_json):
         from_username = input_json['first_name']
 
     return from_username
-

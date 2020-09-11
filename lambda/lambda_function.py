@@ -24,7 +24,7 @@ def lambda_handler(event, context):
     try:
         body = json.loads(event['body'])
         
-        msg.send_message('ADMIN TRACKING: {0}'.format(body), 581975002)
+        #msg.send_message('ADMIN TRACKING: {0}'.format(body), 581975002)
         
         if 'callback_query' in body:
             callback_query = body['callback_query']
