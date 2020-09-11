@@ -136,7 +136,7 @@ def reply_to_message_handler(message):
         from_id = from_obj['id']
         
         # Some people haven't set a username, so use first_name instead
-        raid.get_username(from_obj)
+        from_username = raid.get_username(from_obj)
         
         if reply_text == '/cancel':
             response = raid.cancel_raid(raid_id, from_id)
