@@ -11,12 +11,16 @@ DB_PASSWORD = os.environ['DB_PASSWORD']
 DB_SCHEMA   = os.environ['DB_SCHEMA']
 
 def connect():
-    # Connect to the database
-    connection = pymysql.connect(host=DB_ENDPOINT,
-                                 user=DB_USERNAME,
-                                 password=DB_PASSWORD,
-                                 db=DB_SCHEMA,
-                                 charset='utf8mb4',
-                                 cursorclass=pymysql.cursors.DictCursor,
-                                 init_command="SET SESSION time_zone='Europe/London';")
-    return connection
+    
+    try:
+        # Connect to the database
+        connection = pymysql.connect(host=DB_ENDPOINT,
+                                     user=DB_USERNAME,
+                                     password=DB_PASSWORD,
+                                     db=DB_SCHEMA,
+                                     charset='utf8mb4',
+                                     cursorclass=pymysql.cursors.DictCursor,
+                                     init_command="SET SESSION time_zone='Europe/London';")
+        return connection
+    
+    except Exception as e: raise

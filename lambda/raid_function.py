@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from datetime import date
-import database_connection as db
+import database as db
 
 def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
     
