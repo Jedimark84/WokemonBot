@@ -510,13 +510,13 @@ def join_raid(from_object, raid_id, participation_type_id):
             return False
         
         # ... if they aren't a drop out, they can bring a plus 1?
-        # ... However, if they are bringing a plus one into the remote lobby, then check there is space
-        elif participation_type_id == '0' and not p['participation_type_id'] == 4:
-            if participation_type_id == '2' or participation_type_id == '3':
+        elif int(participation_type_id) == 0 and not p['participation_type_id'] == 4:
+            # ... However, if they are in the remote lobby, then check there is space
+            if p['participation_type_id'] == 2 or p['participation_type_id'] == 3:
                 if remote_count >= 10:
                     return False
-            else:
-                return update_raid_with_a_plus_one(raid_id, from_object['id'], participation_type_id)
+            
+            return update_raid_with_a_plus_one(raid_id, from_object['id'], participation_type_id)
         
         # ... else they must be changing their participation type
         else:
