@@ -31,7 +31,6 @@ CREATE TABLE `raiders` (
   `created` datetime DEFAULT CURRENT_TIMESTAMP,
   `modified` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`telegram_id`),
-  UNIQUE KEY `username_UNIQUE` (`username`),
   UNIQUE KEY `nickname_UNIQUE` (`nickname`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
