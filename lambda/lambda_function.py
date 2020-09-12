@@ -6,7 +6,6 @@ import message_functions as msg
 import raid_function as raid
 import channel_post as chnl
 
-
 from datetime import datetime
 
 # ARNs can be found at the following: https://github.com/keithrozario/Klayers/blob/master/deployments/python3.8/arns/eu-west-2.csv
@@ -24,7 +23,8 @@ def lambda_handler(event, context):
     try:
         body = json.loads(event['body'])
         
-        #msg.send_message('ADMIN TRACKING: {0}'.format(body), 581975002)
+        if os.environ['ADMIN_TRACKING'] == 'On':
+            msg.send_message('ADMIN TRACKING: {0}'.format(body), ADMIN_CHAT_ID)
         
         if 'callback_query' in body:
             callback_query = body['callback_query']
@@ -95,9 +95,6 @@ def lambda_handler(event, context):
                     
                     else:
                         return
-                        msg.send_message('Unsupported Bot Command: {0}\nParams: {1}'.format(bot_command, bot_command_params), chat_id)
-                else:
-                    msg.send_message('{0}'.format(message), chat_id)
                 
                 return
         
@@ -116,9 +113,6 @@ def lambda_handler(event, context):
             'statusCode': 200,
             'body': json.dumps('Success.')
         }
-
-
-
 
 def reply_to_message_handler(message):
     
