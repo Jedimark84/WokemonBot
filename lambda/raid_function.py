@@ -84,8 +84,8 @@ def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
     
     # h) If we are here we can parse the remaining params to get the raid title and raid location
     #    Also make a note of the raid_creator info - they will have admin rights for the raid
-    raid_dict["raid_title"] = remaining.split('@')[0].strip()
-    raid_dict["raid_location"] = remaining.split('@')[1].strip()
+    raid_dict["raid_title"] = remaining.split('@')[0].strip().title()
+    raid_dict["raid_location"] = remaining.split('@')[1].strip().title()
     raid_dict["raid_creator_id"] = raid_creator_id
     raid_dict["raid_creator_username"] = raid_creator_username
     
@@ -327,7 +327,7 @@ def format_raid_message(raid_dict):
     
     # IT IS VERY IMPORTANT THAT THE MESSAGE STARTS WITH 'Raid {raid_id};'
     # IT IS USED TO PARSE CALLBACK RESPONSES TO FIGURE OUT THE RAID ID
-    return "*Raid* {0}; *Organiser:* {1}\n*Time and Title:* {2} \- {3}\n*Location:* {4}\n\n{5}".format(
+    return "*Raid* {0}; *Organiser:* {1}\n*Time & Title:* {2} \- {3}\n*Location:* {4}\n\n{5}".format(
                                             raid_dict.get('raid_id'), \
                                             '[{0}](tg://user?id={1})'.format(''.join([raid_dict.get('raid_creator_username') if not raid_dict.get('raid_creator_nickname') else raid_dict.get('raid_creator_nickname')]), raid_dict.get('raid_creator_id')),
                                             raid_datetime_string,
