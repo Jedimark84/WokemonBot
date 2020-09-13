@@ -1,6 +1,9 @@
 import re
+import string
+
 from datetime import datetime
 from datetime import date
+
 import database as db
 
 def get_raid_by_id(raid_id: int):
@@ -84,8 +87,8 @@ def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
     
     # h) If we are here we can parse the remaining params to get the raid title and raid location
     #    Also make a note of the raid_creator info - they will have admin rights for the raid
-    raid_dict["raid_title"] = remaining.split('@')[0].strip().title()
-    raid_dict["raid_location"] = remaining.split('@')[1].strip().title()
+    raid_dict["raid_title"] = string.capwords(remaining.split('@')[0].strip())
+    raid_dict["raid_location"] = string.capwords(remaining.split('@')[1].strip())
     raid_dict["raid_creator_id"] = raid_creator_id
     raid_dict["raid_creator_username"] = raid_creator_username
     
@@ -594,7 +597,8 @@ def escape(input, max_length):
                                             "{": r"\\{",
                                             "}": r"\\}",
                                             ".": r"\\.",
-                                            "!": r"\\!"
+                                            "!": r"\\!",
+                                            "'": r"\'"
                                         })).strip()
 
 def change_raid_time(raid_id, from_id, time):
