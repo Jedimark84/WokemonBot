@@ -1,5 +1,6 @@
 import os
 import re
+import string
 
 import message_functions as msg
 import raid_function as raid
@@ -102,7 +103,7 @@ def bot_command_time(message_id, chat_id, raid_id, from_id, from_username, time_
 
 def bot_command_title(message_id, chat_id, raid_id, from_id, from_username, title_param):
     
-    title = title_param[:50].strip().title()
+    title = string.capwords(title_param[:50].strip())
     response = raid.change_raid_title(raid_id, from_id, title)
     
     if response.get('success'):
@@ -114,7 +115,7 @@ def bot_command_title(message_id, chat_id, raid_id, from_id, from_username, titl
 
 def bot_command_location(message_id, chat_id, raid_id, from_id, from_username, location_param):
     
-    location = location_param[:50].strip().title()
+    location = string.capwords(location_param[:50].strip())
     response = raid.change_raid_location(raid_id, from_id, location)
     
     if response.get('success'):
