@@ -102,7 +102,7 @@ def bot_command_time(message_id, chat_id, raid_id, from_id, from_username, time_
 
 def bot_command_title(message_id, chat_id, raid_id, from_id, from_username, title_param):
     
-    title = title_param[:50].strip()
+    title = title_param[:50].strip().title()
     response = raid.change_raid_title(raid_id, from_id, title)
     
     if response.get('success'):
@@ -114,7 +114,7 @@ def bot_command_title(message_id, chat_id, raid_id, from_id, from_username, titl
 
 def bot_command_location(message_id, chat_id, raid_id, from_id, from_username, location_param):
     
-    location = location_param[:50].strip()
+    location = location_param[:50].strip().title()
     response = raid.change_raid_location(raid_id, from_id, location)
     
     if response.get('success'):
