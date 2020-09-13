@@ -43,7 +43,6 @@ def lambda_handler(event, context):
             chat = message['chat']
             
             if 'reply_to_message' in message:
-                #reply_to_message = message['reply_to_message']
                 reply.reply_to_message_handler(message)
                 return
             
@@ -65,8 +64,6 @@ def lambda_handler(event, context):
                 if 'from' in message:
                     from_obj = message['from']
                     from_id = from_obj['id']
-                    
-                    # Some people haven't set a username, so use first_name instead
                     from_username = raid.get_username(from_obj)
                 else:
                     msg.send_message('Received a message with no from: {0}'.format(body), ADMIN_CHAT_ID)
