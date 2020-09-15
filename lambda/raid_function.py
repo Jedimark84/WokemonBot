@@ -287,6 +287,12 @@ def format_raid_message(raid_dict):
     if raid_dict.get('cancelled') == 1:
         final_string = '❌ RAID CANCELLED ❌'
     else:
+        
+        if raid_dict.get('gym_name'):
+            raid_location = '[{0}](https://www.google.com/maps/search/?api=1&query={1},{2})'.format(raid_dict.get('gym_name'), raid_dict.get('latitude'), raid_dict.get('longitude'))
+        else:
+            raid_location = raid_dict.get('raid_location')
+        
         raid_participant_dict = get_raid_participants_by_id(raid_dict.get('raid_id'))
         if not raid_participant_dict:
             participation = 'There are currently no participants for this raid\.'
@@ -335,7 +341,7 @@ def format_raid_message(raid_dict):
                                             '[{0}](tg://user?id={1})'.format(''.join([raid_dict.get('raid_creator_username') if not raid_dict.get('raid_creator_nickname') else raid_dict.get('raid_creator_nickname')]), raid_dict.get('raid_creator_id')),
                                             raid_datetime_string,
                                             raid_dict.get('raid_title'),
-                                            raid_dict.get('raid_location'),
+                                            raid_location,
                                             final_string
                                         )
 

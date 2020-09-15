@@ -63,6 +63,26 @@ CREATE TABLE `teams` (
   PRIMARY KEY (`team_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE `gyms` (
+  `gym_id` int NOT NULL AUTO_INCREMENT,
+  `gym_name` varchar(100) NOT NULL,
+  `latitude` decimal(10,8) NOT NULL,
+  `longitude` decimal(11,8) NOT NULL,
+  PRIMARY KEY (`gym_id`),
+  UNIQUE KEY `gym_id_UNIQUE` (`gym_id`),
+  UNIQUE KEY `gym_name_UNIQUE` (`gym_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE `gym_alias` (
+  `gym_alias_id` int NOT NULL AUTO_INCREMENT,
+  `gym_alias` varchar(100) NOT NULL,
+  `gym_id` int NOT NULL,
+  PRIMARY KEY (`gym_alias_id`),
+  UNIQUE KEY `gym_alias_id_UNIQUE` (`gym_alias_id`),
+  UNIQUE KEY `gym_alias_UNIQUE` (`gym_alias`)
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE 
     ALGORITHM = UNDEFINED 
     DEFINER = `admin`@`%` 
@@ -101,7 +121,12 @@ VIEW `vw_raids` AS
         `raids`.`raid_location` AS `raid_location`,
         `raids`.`cancelled` AS `cancelled`,
         `raiders`.`username` AS `raid_creator_username`,
-        `raiders`.`nickname` AS `raid_creator_nickname`
+        `raiders`.`nickname` AS `raid_creator_nickname`,
+        `gyms`.`gym_name` AS `gym_name`,
+        `gyms`.`latitude` AS `latitude`,
+        `gyms`.`longitude` AS `longitude`
     FROM
-        (`raids`
-        JOIN `raiders` ON ((`raiders`.`telegram_id` = `raids`.`raid_creator_id`)));
+        (((`raids`
+        JOIN `raiders` ON ((`raiders`.`telegram_id` = `raids`.`raid_creator_id`)))
+        LEFT JOIN `gym_alias` ON ((`gym_alias`.`gym_alias` LIKE `raids`.`raid_location`)))
+        LEFT JOIN `gyms` ON ((`gyms`.`gym_id` = `gym_alias`.`gym_id`)))
