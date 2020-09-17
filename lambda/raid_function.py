@@ -284,14 +284,14 @@ def format_raid_message(raid_dict):
     else:
         raid_datetime_string = raid_dict.get('raid_datetime').strftime("%d\-%b\-%y\, %H:%M")
     
+    if raid_dict.get('gym_name'):
+        raid_location = '[{0}](https://www.google.com/maps/search/?api=1&query={1},{2})'.format(raid_dict.get('gym_name'), raid_dict.get('latitude'), raid_dict.get('longitude'))
+    else:
+        raid_location = raid_dict.get('raid_location')
+    
     if raid_dict.get('cancelled') == 1:
         final_string = '❌ RAID CANCELLED ❌'
     else:
-        
-        if raid_dict.get('gym_name'):
-            raid_location = '[{0}](https://www.google.com/maps/search/?api=1&query={1},{2})'.format(raid_dict.get('gym_name'), raid_dict.get('latitude'), raid_dict.get('longitude'))
-        else:
-            raid_location = raid_dict.get('raid_location')
         
         raid_participant_dict = get_raid_participants_by_id(raid_dict.get('raid_id'))
         if not raid_participant_dict:
