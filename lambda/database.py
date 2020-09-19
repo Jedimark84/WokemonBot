@@ -1,7 +1,5 @@
 import os
 
-from typing import Dict
-
 # ARNs can be found at the following: https://github.com/keithrozario/Klayers/blob/master/deployments/python3.8/arns/eu-west-2.csv
 # Import pymysql 0.10.0 from layer: arn:aws:lambda:eu-west-2:770693421928:layer:Klayers-python38-PyMySQL:2
 # Is this a trusted source? Maybe we should create our own pymysql layer to use. Or bundle with lambda function.
@@ -27,18 +25,12 @@ def connect() -> pymysql.connections.Connection:
     
     except Exception as e: raise
 
-def select_by_id(table_name: str, where_dict: Dict[str, int], fetch_all: bool=False):
+def select(table_name: str, where_dict: dict, operator: str='=', fetch_all: bool=False):
     
     try:
-        # Generate the WHERE statement
-        where = str()
-        for index, (key, value) in enumerate(where_dict.items()):
-            where = ''.join([where, '`{0}`={1}'.format(key,value) if index == 0 else ' AND `{0}`={1}'.format(key,value)])
-        
         connection = connect()
-        
-        with connect().cursor() as cursor:
-            sql = "SELECT * FROM `{0}` WHERE {1}".format(table_name, where)
+        with connection.cursor() as cursor:
+            sql = "SELECT * FROM `{0}` WHERE {1}".format(table_name, where(where_dict, operator))
             cursor.execute(sql)
             if fetch_all:
                 result = cursor.fetchall()
@@ -51,3 +43,42 @@ def select_by_id(table_name: str, where_dict: Dict[str, int], fetch_all: bool=Fa
         connection.close()
     
     return result
+
+def update(table_name: str, set_dict: dict, where_dict: dict, operator: str='='):
+    
+    try:
+        connection = connect()
+        with connection.cursor() as cursor:
+            sql = "UPDATE `{0}` SET {1} WHERE {2}".format(table_name, set(set_dict, operator), where(where_dict, operator))
+            result = cursor.execute(sql)
+        
+        connection.commit()
+    
+    except Exception as e: raise
+    
+    finally:
+        connection.close()
+    
+    return result
+
+def where(where_dict: dict, operator: str) ->str:
+    
+    try:
+        w = str()
+        for index, (key, value) in enumerate(where_dict.items()):
+            w = ''.join([w, ' `{0}` {1} \'{2}\''.format(key,operator,value) if index == 0 else ' AND `{0}` {1} \'{2}\''.format(key,operator,value)])
+    
+    except Exception as e: raise
+    
+    return w
+
+def set(set_dict: dict, operator: str) ->str:
+    
+    try:
+        s = str()
+        for index, (key, value) in enumerate(set_dict.items()):
+            s = ''.join([s, ' `{0}` {1} \'{2}\''.format(key,operator,value) if index == 0 else ', `{0}` {1} \'{2}\''.format(key,operator,value)])
+    
+    except Exception as e: raise
+    
+    return s

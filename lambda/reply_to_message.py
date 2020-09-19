@@ -104,11 +104,11 @@ def bot_command_time(message_id, chat_id, raid_id, from_id, from_username, time_
 def bot_command_title(message_id, chat_id, raid_id, from_id, from_username, title_param):
     
     title = string.capwords(title_param[:50].strip())
-    response = raid.change_raid_title(raid_id, from_id, title)
+    response = raid.update_raid_title(raid_id, from_id, title)
     
     if response.get('success'):
-        leave_comment_and_update_messages(message_id, raid_id, from_username, 'Changed the raid title to {0}'.format(title_param))
-        return msg.send_message('Raid title has been changed.', chat_id, None)
+        leave_comment_and_update_messages(message_id, raid_id, from_username, 'Updated the raid title to {0}'.format(title_param))
+        return msg.send_message(response.get('success'), chat_id, None)
     
     else:
         return msg.send_message('ERROR: {0}'.format(response.get('error')), chat_id, None)
