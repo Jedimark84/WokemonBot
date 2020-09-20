@@ -72,6 +72,90 @@ def update_raid_title(raid_id, from_id, title):
     
     return { "error": "There was a problem updating the raid title. Please try again later." }
 
+def update_raid_time(raid_id, from_id, time):
+    
+    raid_dict = get_raid_by_id(raid_id)
+    if not raid_dict:
+        return { "error": "Could not find a raid with that id." }
+    else:
+        if not raid_dict.get('raid_creator_id') == int(from_id):
+            return { "error": "Only the raid creator can perform this action." }
+        else:
+            # Verify the time is acceptable, not in the past
+            current_datetime = raid_dict.get('raid_datetime')
+            new_datetime = raid_dict.get('raid_datetime').replace(
+                hour=int(time.split(':')[0]),
+                minute=int(time.split(':')[1]),
+                second=0,
+                microsecond=0
+            )
+            if new_datetime < datetime.now():
+                return { "error": "You cannot schedule a raid for the past." }
+            else:
+                result = db.update('raids', { 'raid_datetime': new_datetime.strftime("%Y/%m/%d, %H:%M:%S") }, { 'raid_id': raid_id })
+                if result:
+                    return { "success": "Raid time has been updated." }
+                else:
+                    return { "error": "Raid time was not updated." }
+    
+    return { "error": "There was a problem updating the raid time. Please try again later." }
+
+def update_raid_location(raid_id, from_id, location):
+    
+    raid_dict = get_raid_by_id(raid_id)
+    if not raid_dict:
+        return { "error": "Could not find a raid with that id." }
+    else:
+        if not raid_dict.get('raid_creator_id') == int(from_id):
+            return { "error": "Only the raid creator can perform this action." }
+        else:
+            result = db.update('raids', { 'raid_location': escape(location, 50) }, { 'raid_id': raid_id })
+            if result:
+                return { "success": "Raid location has been updated." }
+            else:
+                return { "error": "Raid location was not updated." }
+    
+    return { "error": "There was a problem updating the raid location. Please try again later." }
+
+def cancel_raid(raid_id, from_id):
+    
+    raid_dict = get_raid_by_id(raid_id)
+    if not raid_dict:
+        return { "error": "Could not find a raid with that id." }
+    else:
+        if not raid_dict.get('raid_creator_id') == int(from_id):
+            return { "error": "Only the raid creator can perform this action." }
+        else:
+            result = db.update('raids', { 'cancelled': 1 }, { 'raid_id': raid_id })
+            if result:
+                return { "success": "Raid has been cancelled." }
+            else:
+                return { "error": "Raid was not cancelled." }
+    
+    return { "error": "There was a problem cancelling the raid. Please try again later." }
+
+def increment_party_count(raid_id, raider_id):
+    
+    # Connect to the database
+    connection = db.connect()
+    
+    try:
+        with connection.cursor() as cursor:
+            # Update an existing record
+            sql = "UPDATE `raid_participants` SET `party_count` = `party_count` + 1 WHERE `raid_id` = {0} and `raider_id` = {1}".format(raid_id, raider_id)
+            cursor.execute(sql)
+        
+        connection.commit()
+        
+        return True
+    
+    # If there is an error then raise it to the calling function.
+    # It should get handled by the lambda_handler function.
+    #except Exception as e: raise
+    
+    finally:
+        connection.close()
+
 def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
     
     # Stage 1: Validate Raid Params.
@@ -278,37 +362,6 @@ def format_raid_message(raid_dict):
                                             final_string
                                         )
 
-def cancel_raid(raid_id, from_id):
-    
-    raid_dict = get_raid_by_id(raid_id)
-    if not raid_dict:
-        return { "error": "Could not find a raid with that id." }
-    else:
-        if not raid_dict.get('raid_creator_id') == int(from_id):
-            return { "error": "Only the raid creator can cancel the raid." }
-        else:
-            # Connect to the database
-            connection = db.connect()
-            
-            try:
-                with connection.cursor() as cursor:
-                    # Update an existing record
-                    sql = "UPDATE `raids` SET `cancelled` = 1 WHERE `raid_id` = {0}".format(raid_id)
-                    cursor.execute(sql)
-                
-                connection.commit()
-                
-                return { "success": "Raid Cancelled." }
-            
-            # If there is an error then raise it to the calling function.
-            # It should get handled by the lambda_handler function.
-            #except Exception as e: raise
-            
-            finally:
-                connection.close()
-    
-    return { "error": "There was a problem cancelling the raid. Please try again later." }
-
 def insert_message_tracking(raid_id, chat_id, message_id):
     
     # Connect to the database
@@ -435,7 +488,7 @@ def join_raid(from_object, raid_id, participation_type_id):
                 if remote_count >= 10:
                     return False
             
-            return update_raid_with_a_plus_one(raid_id, from_object['id'], participation_type_id)
+            return increment_party_count(raid_id, from_object['id'])
         
         # ... else they must be changing their participation type
         else:
@@ -443,32 +496,6 @@ def join_raid(from_object, raid_id, participation_type_id):
     
     # I don't think it should be possible to get to this point
     return False
-
-def update_raid_with_a_plus_one(raid_id, raider_id, participation_type_id):
-    
-    return (increment_party_count(raid_id, raider_id))
-
-def increment_party_count(raid_id, raider_id):
-    
-    # Connect to the database
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            # Update an existing record
-            sql = "UPDATE `raid_participants` SET `party_count` = `party_count` + 1 WHERE `raid_id` = {0} and `raider_id` = {1}".format(raid_id, raider_id)
-            cursor.execute(sql)
-        
-        connection.commit()
-        
-        return True
-    
-    # If there is an error then raise it to the calling function.
-    # It should get handled by the lambda_handler function.
-    #except Exception as e: raise
-    
-    finally:
-        connection.close()
 
 def insert_raid_comment(comment, username, raid_id, comment_id):
     
@@ -516,82 +543,6 @@ def escape(input, max_length):
                                             "!": r"\\!",
                                             "'": r"\'"
                                         })).strip()
-
-def change_raid_time(raid_id, from_id, time):
-    
-    raid_dict = get_raid_by_id(raid_id)
-    if not raid_dict:
-        return { "error": "Could not find a raid with that id." }
-    else:
-        if not raid_dict.get('raid_creator_id') == int(from_id):
-            return { "error": "Only the raid creator can perform this action." }
-        else:
-            # Verify the time is acceptable, not in the past
-            current_datetime = raid_dict.get('raid_datetime')
-            new_datetime = raid_dict.get('raid_datetime').replace(
-                hour=int(time.split(':')[0]),
-                minute=int(time.split(':')[1]),
-                second=0,
-                microsecond=0
-            )
-            if new_datetime < datetime.now():
-                return { "error": "You cannot schedule a raid for the past." }
-            else:
-                
-                # Connect to the database
-                connection = db.connect()
-                
-                try:
-                    
-                    with connection.cursor() as cursor:
-                        # Update an existing record
-                        sql = "UPDATE `raids` SET `raid_datetime` = '{0}' WHERE `raid_id` = {1}".format(new_datetime.strftime("%Y/%m/%d, %H:%M:%S"), raid_id)
-                        cursor.execute(sql)
-                    
-                    connection.commit()
-                    
-                    return { "success": "Raid time changed." }
-                
-                # If there is an error then raise it to the calling function.
-                # It should get handled by the lambda_handler function.
-                except Exception as e: raise
-                
-                finally:
-                    connection.close()
-    
-    return { "error": "There was a problem changing the raid time. Please try again later." }
-
-def change_raid_location(raid_id, from_id, location):
-    
-    raid_dict = get_raid_by_id(raid_id)
-    if not raid_dict:
-        return { "error": "Could not find a raid with that id." }
-    else:
-        if not raid_dict.get('raid_creator_id') == int(from_id):
-            return { "error": "Only the raid creator can perform this action." }
-        else:
-            
-            # Connect to the database
-            connection = db.connect()
-            
-            try:
-                with connection.cursor() as cursor:
-                    # Update an existing record
-                    sql = "UPDATE `raids` SET `raid_location` = '{0}' WHERE `raid_id` = {1}".format(escape(location, 50), raid_id)
-                    cursor.execute(sql)
-                
-                connection.commit()
-                
-                return { "success": "Raid location changed." }
-            
-            # If there is an error then raise it to the calling function.
-            # It should get handled by the lambda_handler function.
-            except Exception as e: raise
-            
-            finally:
-                connection.close()
-    
-    return { "error": "There was a problem changing the raid location. Please try again later." }
 
 def get_username(input_json):
     # Some people haven't set a username, so use first_name instead

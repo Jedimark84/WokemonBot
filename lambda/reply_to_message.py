@@ -92,11 +92,11 @@ def bot_command_time(message_id, chat_id, raid_id, from_id, from_username, time_
         return msg.send_message('ERROR: Please supply the time in the format: hh:mm', chat_id, None)
     
     else:
-        response = raid.change_raid_time(raid_id, from_id, time_param)
+        response = raid.update_raid_time(raid_id, from_id, time_param)
         
         if response.get('success'):
-            leave_comment_and_update_messages(message_id, raid_id, from_username, 'Changed the raid time to {0}'.format(time_param))
-            return msg.send_message('Raid time has been changed.', chat_id, None)
+            leave_comment_and_update_messages(message_id, raid_id, from_username, 'Updated the raid time to {0}'.format(time_param))
+            return msg.send_message(response.get('success'), chat_id, None)
         
         else:
             return msg.send_message('ERROR: {0}'.format(response.get('error')), chat_id, None)
@@ -116,11 +116,11 @@ def bot_command_title(message_id, chat_id, raid_id, from_id, from_username, titl
 def bot_command_location(message_id, chat_id, raid_id, from_id, from_username, location_param):
     
     location = string.capwords(location_param[:50].strip())
-    response = raid.change_raid_location(raid_id, from_id, location)
+    response = raid.update_raid_location(raid_id, from_id, location)
     
     if response.get('success'):
-        leave_comment_and_update_messages(message_id, raid_id, from_username, 'Changed the raid location to {0}'.format(location_param))
-        return msg.send_message('Raid location has been changed.', chat_id, None)
+        leave_comment_and_update_messages(message_id, raid_id, from_username, 'Updated the raid location to {0}'.format(location_param))
+        return msg.send_message(response.get('success'), chat_id, None)
     
     else:
         return msg.send_message('ERROR: {0}'.format(response.get('error')), chat_id, None)
