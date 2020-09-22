@@ -135,26 +135,37 @@ def cancel_raid(raid_id, from_id):
     return { "error": "There was a problem cancelling the raid. Please try again later." }
 
 def increment_party_count(raid_id, raider_id):
+    db.update_increment('raid_participants', 'party_count', { 'raid_id': raid_id, 'raider_id': raider_id })
+    return True # TODO: return from calling function instead of having to return True
+
+def insert_raid(raid_dict):
     
-    # Connect to the database
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            # Update an existing record
-            sql = "UPDATE `raid_participants` SET `party_count` = `party_count` + 1 WHERE `raid_id` = {0} and `raider_id` = {1}".format(raid_id, raider_id)
-            cursor.execute(sql)
-        
-        connection.commit()
-        
-        return True
-    
-    # If there is an error then raise it to the calling function.
-    # It should get handled by the lambda_handler function.
-    #except Exception as e: raise
-    
-    finally:
-        connection.close()
+    # Step 1: Verify the user exists in the raiders table
+    #         If they don't then create them!
+    if not get_raider_by_id(raid_dict.get('raid_creator_id')):
+        insert_raider(raid_dict.get('raid_creator_id'), raid_dict.get('raid_creator_username'))
+
+    return db.insert('raids', { 'raid_creator_id': raid_dict.get('raid_creator_id'), \
+                                'raid_datetime': raid_dict.get('raid_datetime').strftime("%Y/%m/%d, %H:%M:%S"), \
+                                'raid_title': escape(raid_dict.get('raid_title'), 50), \
+                                'raid_location': escape(raid_dict.get('raid_location'), 50) \
+                                }, 'raid_id')
+
+def insert_message_tracking(raid_id, chat_id, message_id):
+    return db.insert('message_tracking', { 'raid_id': raid_id, 'chat_id': chat_id, 'message_id': message_id } )
+
+def insert_raid_comment(comment, username, raid_id, comment_id):
+    return db.insert('raid_comments', { 'comment_id': comment_id, 'raid_id': raid_id, 'username': escape(username, 32), 'comment': escape(comment, 200) } )
+
+def insert_raid_participation(raid_id, raider_id, participation_type_id):
+    return db.insert('raid_participants', { 'raid_id': raid_id, 'raider_id': raider_id, 'participation_type_id': participation_type_id, 'party_count': 1 } )
+
+def insert_raider(telegram_id, username, nickname=None):
+    if nickname:
+        return db.insert('raiders', { 'telegram_id': telegram_id, 'username': escape(username, 32), 'nickname': escape(nickname, 32) } )
+    else:
+        return db.insert('raiders', { 'telegram_id': telegram_id, 'username': escape(username, 32) } )
+
 
 def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
     
@@ -246,45 +257,6 @@ def determine_raid_time(input):
     else:
         return False
 
-def insert_raid(raid_dict):
-    
-    # Step 1: Verify the user exists in the raiders table
-    #         If they don't then create them!
-    if not get_raider_by_id(raid_dict.get('raid_creator_id')):
-        insert_raider(raid_dict.get('raid_creator_id'), raid_dict.get('raid_creator_username'))
-    
-    # Connect to the database
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            # Create a new record
-            sql = "INSERT INTO `raids` (`raid_creator_id`, `raid_datetime`, `raid_title`, `raid_location`) \
-                    VALUES ({0}, '{1}', '{2}', '{3}')".format(
-                        raid_dict.get('raid_creator_id'), \
-                        raid_dict.get('raid_datetime').strftime("%Y/%m/%d, %H:%M:%S"), \
-                        escape(raid_dict.get('raid_title'), 50), \
-                        escape(raid_dict.get('raid_location'), 50)
-                    )
-            cursor.execute(sql)
-        
-        with connection.cursor() as cursor:
-            # Grab the record we just created to pass back. We will want the raid_id from it.
-            sql = "SELECT * FROM `raids` WHERE raid_id = @@Identity"
-            cursor.execute(sql)
-            result = cursor.fetchone()
-        
-        connection.commit()
-    
-    # If there is an error then raise it to the calling function.
-    # It should get handled by the lambda_handler function.
-    except Exception as e: raise
-    
-    finally:
-        connection.close()
-    
-    return result
-
 def format_raider(raider_dict):
     
     player_str = '[{0}](tg://user?id={1})'.format(''.join([raider_dict.get('username') if not raider_dict.get('nickname') else raider_dict.get('nickname')]), raider_dict.get('raider_id'))
@@ -302,7 +274,7 @@ def format_raid_message(raid_dict):
         raid_datetime_string = raid_dict.get('raid_datetime').strftime("%d\-%b\-%y\, %H:%M")
     
     if raid_dict.get('gym_name'):
-        raid_location = '[{0}](https://www.google.com/maps/search/?api=1&query={1},{2})'.format(raid_dict.get('gym_name'), raid_dict.get('latitude'), raid_dict.get('longitude'))
+        raid_location = '📍[{0}](https://www.google.com/maps/search/?api=1&query={1},{2})'.format(raid_dict.get('gym_name'), raid_dict.get('latitude'), raid_dict.get('longitude'))
     else:
         raid_location = raid_dict.get('raid_location')
     
@@ -361,75 +333,6 @@ def format_raid_message(raid_dict):
                                             raid_location,
                                             final_string
                                         )
-
-def insert_message_tracking(raid_id, chat_id, message_id):
-    
-    # Connect to the database
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            # Create a new record
-            sql = "INSERT INTO `message_tracking` (`raid_id`, `chat_id`, `message_id`) \
-                    VALUES ({0}, {1}, {2})".format(raid_id, chat_id, message_id)
-            cursor.execute(sql)
-        
-        connection.commit()
-    
-    # If there is an error then raise it to the calling function.
-    # It should get handled by the lambda_handler function.
-    #except Exception as e: raise
-    
-    finally:
-        connection.close()
-
-def insert_raider(telegram_id, username, nickname=None):
-    
-    # Connect to the database
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            # Create a new record
-            if nickname:
-                sql = "INSERT INTO `raiders` (`telegram_id`, `username`, `nickname`) \
-                            VALUES ({0}, '{1}', '{2}')".format(telegram_id, escape(username, 32), escape(nickname, 32))
-            else:
-                sql = "INSERT INTO `raiders` (`telegram_id`, `username`) \
-                        VALUES ({0}, '{1}')".format(telegram_id, escape(username, 32))
-            cursor.execute(sql)
-        
-        connection.commit()
-    
-    # If there is an error then raise it to the calling function.
-    # It should get handled by the lambda_handler function.
-    #except Exception as e: raise
-    
-    finally:
-        connection.close()
-
-def insert_raid_participation(raid_id, raider_id, participation_type_id):
-    
-    # Connect to the database
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            # Create a new record
-            sql = "INSERT INTO `raid_participants` (`raid_id`, `raider_id`, `participation_type_id`, `party_count`) \
-                    VALUES ({0}, {1}, {2}, {3})".format(raid_id, raider_id, participation_type_id, 1)
-            cursor.execute(sql)
-        
-        connection.commit()
-        
-        return True
-    
-    # If there is an error then raise it to the calling function.
-    # It should get handled by the lambda_handler function.
-    #except Exception as e: raise
-    
-    finally:
-        connection.close()
 
 def join_raid(from_object, raid_id, participation_type_id):
     
@@ -496,29 +399,6 @@ def join_raid(from_object, raid_id, participation_type_id):
     
     # I don't think it should be possible to get to this point
     return False
-
-def insert_raid_comment(comment, username, raid_id, comment_id):
-    
-    # Connect to the database
-    connection = db.connect()
-    
-    try:
-        with connection.cursor() as cursor:
-            # Create a new record
-            sql = "INSERT INTO `raid_comments` (`comment_id`, `raid_id`, `username`, `comment`) \
-                    VALUES ({0}, {1}, '{2}', '{3}')".format(comment_id, raid_id, escape(username, 32), escape(comment, 200))
-            cursor.execute(sql)
-        
-        connection.commit()
-        
-        return True
-    
-    # If there is an error then raise it to the calling function.
-    # It should get handled by the lambda_handler function.
-    except Exception as e: raise
-    
-    finally:
-        connection.close()
 
 def escape(input, max_length):
     
