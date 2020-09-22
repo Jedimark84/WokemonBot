@@ -11,7 +11,7 @@ import reply_to_message as reply
 from datetime import datetime
 
 # ARNs can be found at the following: https://github.com/keithrozario/Klayers/blob/master/deployments/python3.8/arns/eu-west-2.csv
-# Import pymysql 0.10.0 from layer: arn:aws:lambda:eu-west-2:770693421928:layer:Klayers-python38-PyMySQL:2
+# Import pymysql 0.10.1 from layer: arn:aws:lambda:eu-west-2:770693421928:layer:Klayers-python38-PyMySQL:3
 # Is this a trusted source? Maybe we should create our own pymysql layer to use. Or bundle with lambda function.
 import pymysql
 
