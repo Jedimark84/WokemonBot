@@ -13,7 +13,7 @@ def get_raid_participants_by_id(raid_id: int):
     return db.select('vw_raiders', { 'raid_id': raid_id }, fetch_all=True)
 
 def get_message_tracking_by_id(raid_id: int):
-    return db.select('message_tracking', { 'raid_id': raid_id }, fetch_all=True)
+    return db.select('message_tracking', { 'raid_id': raid_id, 'completed': 0 }, fetch_all=True)
 
 def get_raid_comments_by_id(raid_id: int):
     return db.select('raid_comments', { 'raid_id': raid_id }, fetch_all=True)
@@ -321,7 +321,12 @@ def format_raid_message(raid_dict):
         if raid_comments_dict:
             for c in raid_comments_dict:
                 comments += '{0}: _{1}_\n'.format(c['username'], c['comment'])
-        final_string = '{0}\n{1}'.format(participation, comments)
+        
+        completed = str()
+        if raid_dict.get('completed') == 1:
+            completed = 'RAID COMPLETED'
+        
+        final_string = '{0}\n{1}\n{2}'.format(participation, comments, completed)
     
     # IT IS VERY IMPORTANT THAT THE MESSAGE STARTS WITH 'Raid {raid_id};'
     # IT IS USED TO PARSE CALLBACK RESPONSES TO FIGURE OUT THE RAID ID

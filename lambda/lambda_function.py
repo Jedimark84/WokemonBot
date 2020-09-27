@@ -7,6 +7,7 @@ import raid_function as raid
 import channel_post as chnl
 import callback_query as cbk
 import reply_to_message as reply
+import garbage_collection as gc
 
 from datetime import datetime
 
@@ -15,7 +16,8 @@ from datetime import datetime
 # Is this a trusted source? Maybe we should create our own pymysql layer to use. Or bundle with lambda function.
 import pymysql
 
-ADMIN_CHAT_ID  = os.environ['ADMIN_CHAT_ID']
+ADMIN_CHAT_ID      = os.environ['ADMIN_CHAT_ID']
+CHAT_CHANNEL_LINKS = json.loads(os.environ['CHAT_CHANNEL_LINKS'])
 
 def lambda_handler(event, context):
     
@@ -23,10 +25,16 @@ def lambda_handler(event, context):
     print(event)
     
     try:
+        
+        if event.get('resources'):
+            if 'wokemon-garbage-collection' in event['resources'][0]:
+                msg.send_message('Running Garbage Collection!', ADMIN_CHAT_ID)
+                return gc.garbage_collection()
+        
         body = json.loads(event['body'])
         
         if os.environ['ADMIN_TRACKING'] == 'On':
-            msg.send_message('ADMIN TRACKING: {0}'.format(body), ADMIN_CHAT_ID)
+            msg.send_message('ADMIN TRACKING: {0}'.format(event), ADMIN_CHAT_ID)
         
         if 'callback_query' in body:
             callback_query = body['callback_query']
@@ -97,20 +105,18 @@ def lambda_handler(event, context):
         msg.send_message('Unsupported event received with body: {0}'.format(body), ADMIN_CHAT_ID, None)
     
     except pymysql.err.ProgrammingError as pe:
-        msg.send_message('*\[ERROR\]* A database error has occured\. Please try again in a few minutes\.', chat_id, 'MarkdownV2')
         msg.send_message('A database error of type {0} has occured: {1}'.format(type(pe), pe.args), ADMIN_CHAT_ID, None)
-    
+        msg.send_message('*\[ERROR\]* A database error has occured\. Please try again in a few minutes\.', chat_id, 'MarkdownV2')
+        
     except Exception as e:
+        msg.send_message('An unhandled error of type {0} has occured: {1}\n\n{2}'.format(type(e), e.args, event), ADMIN_CHAT_ID, None)
         msg.send_message('*\[ERROR\]* An unhandled error has occured\. Please try again in a few minutes\.', chat_id, 'MarkdownV2')
-        msg.send_message('An unhandled error of type {0} has occured: {1}\n\n{2}'.format(type(e), e.args, body), ADMIN_CHAT_ID, None)
     
     finally:
         return {
             'statusCode': 200,
             'body': json.dumps('Success.')
         }
-
-
 
 def bot_command_newraid(raid_params, chat_id, from_id, from_username):
     
@@ -120,6 +126,10 @@ def bot_command_newraid(raid_params, chat_id, from_id, from_username):
         return msg.send_message('ERROR: {0}'.format(raid_info.get('error')), chat_id, None)
     
     bot_command_raid(str(raid_info.get('raid_id')), chat_id)
+    
+    # If the newraid request originates from a chat with a channel link then cross post the raid message to the channel
+    if CHAT_CHANNEL_LINKS.get(str(chat_id)):
+        bot_command_raid(str(raid_info.get('raid_id')), CHAT_CHANNEL_LINKS[str(chat_id)])
 
 def bot_command_level(command_params, chat_id, from_id, from_username):
     
@@ -172,7 +182,10 @@ def bot_command_raid(command_params, chat_id):
     raid_detail = raid.get_raid_by_id(command_params)
     if not raid_detail:
         return msg.send_message('That is not a valid raid id.', chat_id, None)
-    
+        
     tracked_message = msg.send_message(raid.format_raid_message(raid_detail), chat_id, 'MarkdownV2', True)
-    tracked_data = json.loads(tracked_message.data.decode("utf-8"))
-    raid.insert_message_tracking(command_params, tracked_data['result']['chat']['id'], tracked_data['result']['message_id'])
+    
+    # Only track messages for raids that have not completed
+    if raid_detail['completed'] == 0:
+        tracked_data = json.loads(tracked_message.data.decode("utf-8"))
+        raid.insert_message_tracking(command_params, tracked_data['result']['chat']['id'], tracked_data['result']['message_id'])

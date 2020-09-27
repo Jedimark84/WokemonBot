@@ -2,7 +2,9 @@ CREATE TABLE `message_tracking` (
   `raid_id` int NOT NULL,
   `chat_id` bigint NOT NULL,
   `message_id` int NOT NULL,
-  `created` datetime DEFAULT CURRENT_TIMESTAMP,
+  `created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `modified` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `completed` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`raid_id`,`chat_id`,`message_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -18,7 +20,7 @@ CREATE TABLE `raid_comments` (
   `raid_id` int NOT NULL,
   `username` varchar(96) NOT NULL,
   `comment` varchar(600) NOT NULL,
-  `created` datetime DEFAULT CURRENT_TIMESTAMP,
+  `created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`comment_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -28,7 +30,7 @@ CREATE TABLE `raiders` (
   `nickname` varchar(64) DEFAULT NULL,
   `level` int DEFAULT NULL,
   `team_id` int DEFAULT NULL,
-  `created` datetime DEFAULT CURRENT_TIMESTAMP,
+  `created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `modified` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`telegram_id`),
   UNIQUE KEY `nickname_UNIQUE` (`nickname`)
@@ -39,7 +41,7 @@ CREATE TABLE `raid_participants` (
   `raider_id` int NOT NULL,
   `participation_type_id` int NOT NULL,
   `party_count` int NOT NULL DEFAULT '1',
-  `created` datetime DEFAULT CURRENT_TIMESTAMP,
+  `created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `modified` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`raid_id`,`raider_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -50,9 +52,10 @@ CREATE TABLE `raids` (
   `raid_datetime` datetime NOT NULL,
   `raid_title` varchar(150) NOT NULL,
   `raid_location` varchar(150) NOT NULL,
+  `cancelled` int NOT NULL DEFAULT '0',
+  `completed` int NOT NULL DEFAULT '0',
   `created` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `modified` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-  `cancelled` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`raid_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -71,8 +74,7 @@ CREATE TABLE `gyms` (
   PRIMARY KEY (`gym_id`),
   UNIQUE KEY `gym_id_UNIQUE` (`gym_id`),
   UNIQUE KEY `gym_name_UNIQUE` (`gym_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `gym_alias` (
   `gym_alias_id` int NOT NULL AUTO_INCREMENT,
@@ -81,7 +83,7 @@ CREATE TABLE `gym_alias` (
   PRIMARY KEY (`gym_alias_id`),
   UNIQUE KEY `gym_alias_id_UNIQUE` (`gym_alias_id`),
   UNIQUE KEY `gym_alias_UNIQUE` (`gym_alias`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE 
     ALGORITHM = UNDEFINED 
@@ -120,6 +122,7 @@ VIEW `vw_raids` AS
         `raids`.`raid_title` AS `raid_title`,
         `raids`.`raid_location` AS `raid_location`,
         `raids`.`cancelled` AS `cancelled`,
+        `raids`.`completed` AS `completed`,
         `raiders`.`username` AS `raid_creator_username`,
         `raiders`.`nickname` AS `raid_creator_nickname`,
         `gyms`.`gym_name` AS `gym_name`,
@@ -130,3 +133,25 @@ VIEW `vw_raids` AS
         JOIN `raiders` ON ((`raiders`.`telegram_id` = `raids`.`raid_creator_id`)))
         LEFT JOIN `gym_alias` ON ((`gym_alias`.`gym_alias` LIKE `raids`.`raid_location`)))
         LEFT JOIN `gyms` ON ((`gyms`.`gym_id` = `gym_alias`.`gym_id`)))
+
+CREATE 
+    ALGORITHM = UNDEFINED 
+    DEFINER = `admin`@`%` 
+    SQL SECURITY DEFINER
+VIEW `vw_raids_to_complete` AS
+    SELECT 
+        `raids`.`raid_id` AS `raid_id`,
+        `raids`.`raid_creator_id` AS `raid_creator_id`,
+        `raids`.`raid_datetime` AS `raid_datetime`,
+        `raids`.`raid_title` AS `raid_title`,
+        `raids`.`raid_location` AS `raid_location`,
+        `raids`.`cancelled` AS `cancelled`,
+        `raids`.`completed` AS `completed`,
+        `raids`.`created` AS `created`,
+        `raids`.`modified` AS `modified`
+    FROM
+        `raids`
+    WHERE
+        ((`raids`.`completed` = 0)
+            AND (`raids`.`raid_datetime` <= (NOW() - INTERVAL 10 MINUTE)))
+    LIMIT 0 , 10

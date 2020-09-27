@@ -73,7 +73,10 @@ def bot_command_raid(bot_command_params: str, chat_id: int):
             return msg.send_message('That is not a valid raid id.', chat_id, None)
         
         tracked_data = msg.decode_http_response_as_dict(msg.send_message(raid.format_raid_message(raid_detail), chat_id, 'MarkdownV2', True))
-        raid.insert_message_tracking(bot_command_params, tracked_data['result']['chat']['id'], tracked_data['result']['message_id'])
+        
+        # Only track messages for raids that have not completed
+        if raid_detail['completed'] == 0:
+            raid.insert_message_tracking(bot_command_params, tracked_data['result']['chat']['id'], tracked_data['result']['message_id'])
         
         return
     
