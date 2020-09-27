@@ -13,7 +13,7 @@ def reply_to_message_handler(message: dict):
     
     try:
         
-        # Check all mandatory fields exist in the callback_query message
+        # Check all mandatory fields exist in message
         if not (all(x in message for x in ['message_id', 'from', 'chat', 'reply_to_message', 'text'])):
             return
         
@@ -23,7 +23,7 @@ def reply_to_message_handler(message: dict):
         reply_to_message = message['reply_to_message']
         reply_text       = message['text']
         
-        # Check all mandatory fields exist in the reply_to_message
+        # Check all mandatory fields exist in reply_to_message
         if not (all(x in reply_to_message for x in ['message_id', 'from', 'chat', 'text'])):
             return
         
@@ -41,6 +41,11 @@ def reply_to_message_handler(message: dict):
             chat_id       = chat['id']
             from_id       = from_obj['id']
             from_username = raid.get_username(from_obj)
+
+            # I only respond to active raids (i.e. not cancelled or completed)
+            r = raid.get_raid_by_id(raid_id)
+            if r['cancelled'] == 1 or r['completed'] == 1:
+                return
             
             # Is the reply a bot command?
             if reply_text.startswith('/'):
@@ -131,4 +136,4 @@ def leave_comment_and_update_messages(message_id, raid_id, from_username, commen
         formatted_message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
         tracking = raid.get_message_tracking_by_id(raid_id)
         for t in tracking:
-            msg.edit_message(t.get('chat_id'),t.get('message_id'),formatted_message,'MarkdownV2', True)
+            msg.edit_message(t.get('chat_id'), t.get('message_id'), formatted_message, 'MarkdownV2', True)
