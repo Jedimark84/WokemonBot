@@ -20,53 +20,49 @@ ADMIN_CHAT_ID      = os.environ['ADMIN_CHAT_ID']
 CHAT_CHANNEL_LINKS = json.loads(os.environ['CHAT_CHANNEL_LINKS'])
 
 def lambda_handler(event, context):
-    
-    # Write the event out so it appears in the CloudWatch Logs for debugging
-    print(event)
-    
+
     try:
         
-        if event.get('resources'):
-            if 'wokemon-garbage-collection' in event['resources'][0]:
-                msg.send_message('Running Garbage Collection!', ADMIN_CHAT_ID)
-                return gc.garbage_collection()
-        
-        body = json.loads(event['body'])
-        
+        # If admin tracking is on, send the event to the admin telegram chat
         if os.environ['ADMIN_TRACKING'] == 'On':
             msg.send_message('ADMIN TRACKING: {0}'.format(event), ADMIN_CHAT_ID)
         
+        # Has the trigger originated from EventBridge
+        if event.get('resources'):
+            if 'wokemon-garbage-collection' in event['resources'][0]:
+                return gc.garbage_collection()
+        
+        # Has the trigger originated from SQS
+        if event.get('Records'):
+            event = event['Records'][0]
+            sqs_message_id = event['messageId']
+        
+        body = json.loads(event['body'])
+        
+        # Echo the event body so it appears in CloudWatch Logs
+        print(json.dumps(body))
+        
         if 'callback_query' in body:
-            callback_query = body['callback_query']
-            cbk.callback_query_handler(callback_query)
-            return
+            return cbk.callback_query_handler(body['callback_query'])
         
         if 'channel_post' in body:
-            channel_post = body['channel_post']
-            chnl.channel_post_handler(channel_post)
-            return
+            return chnl.channel_post_handler(body['channel_post'])
         
         if 'message' in body:
+            
             message = body['message']
-            chat = message['chat']
+            
+            # Do not respond to unsupported events
+            UNSUPPORTED_EVENTS = ['photo', 'document', 'voice', 'audio', 'forward_from', 'edited_message', 'new_chat_participant', 'left_chat_participant']
+            if (any(x in message for x in UNSUPPORTED_EVENTS)):
+                return
             
             if 'reply_to_message' in message:
-                reply.reply_to_message_handler(message)
-                return
-            
-            if 'new_chat_participant' in message:
-                new_chat_participant = message['new_chat_participant']
-                msg.send_message('new_chat_participant message received: {0}'.format(body), ADMIN_CHAT_ID, None)
-                return
-            
-            if 'left_chat_participant' in message:
-                left_chat_participant = message['left_chat_participant']
-                msg.send_message('left_chat_participant message received: {0}'.format(body), ADMIN_CHAT_ID, None)
-                return
+                return reply.reply_to_message_handler(message)
             
             if 'text' in message:
                 text = message['text'].strip()
-                
+                chat = message['chat']
                 chat_id = chat['id']
                 
                 if 'from' in message:
@@ -80,7 +76,7 @@ def lambda_handler(event, context):
                 if re.match('^/[a-z0-9]+($|\s)', text):
                     
                     bot_command=re.match('^/[a-z0-9]+($|\s)', text)[0].strip()
-                    bot_command_params=text.replace(bot_command,'').strip()
+                    bot_command_params=text.replace(bot_command, '').strip()
                     
                     if bot_command == '/newraid':
                         bot_command_newraid(bot_command_params, chat_id, from_id, from_username)
@@ -102,14 +98,14 @@ def lambda_handler(event, context):
                 
                 return
         
-        msg.send_message('Unsupported event received with body: {0}'.format(body), ADMIN_CHAT_ID, None)
+        msg.send_message('Unrecognised event received with body: {0}'.format(body), ADMIN_CHAT_ID)
     
     except pymysql.err.ProgrammingError as pe:
-        msg.send_message('A database error of type {0} has occured: {1}'.format(type(pe), pe.args), ADMIN_CHAT_ID, None)
+        msg.send_message('A database error of type {0} has occured: {1}'.format(type(pe), pe.args), ADMIN_CHAT_ID)
         msg.send_message('*\[ERROR\]* A database error has occured\. Please try again in a few minutes\.', chat_id, 'MarkdownV2')
-        
+    
     except Exception as e:
-        msg.send_message('An unhandled error of type {0} has occured: {1}\n\n{2}'.format(type(e), e.args, event), ADMIN_CHAT_ID, None)
+        msg.send_message('An unhandled error of type {0} has occured: {1}\n\n{2}'.format(type(e), e.args, event), ADMIN_CHAT_ID)
         msg.send_message('*\[ERROR\]* An unhandled error has occured\. Please try again in a few minutes\.', chat_id, 'MarkdownV2')
     
     finally:
@@ -123,7 +119,7 @@ def bot_command_newraid(raid_params, chat_id, from_id, from_username):
     raid_info = raid.create_raid(raid_params, chat_id, from_id, from_username)
     
     if raid_info.get('error'):
-        return msg.send_message('ERROR: {0}'.format(raid_info.get('error')), chat_id, None)
+        return msg.send_message('ERROR: {0}'.format(raid_info.get('error')), chat_id)
     
     bot_command_raid(str(raid_info.get('raid_id')), chat_id)
     
@@ -134,40 +130,40 @@ def bot_command_newraid(raid_params, chat_id, from_id, from_username):
 def bot_command_level(command_params, chat_id, from_id, from_username):
     
     if not str(command_params).isdigit():
-        return msg.send_message('ERROR: Invalid level provided. Please try again.', chat_id, None, None)
+        return msg.send_message('ERROR: Invalid level provided. Please try again.', chat_id)
     else:
         level = int(command_params)
         if not 1 <= level <= 40:
-            return msg.send_message('ERROR: Level must be between 1 and 40.', chat_id, None, None)
+            return msg.send_message('ERROR: Level must be between 1 and 40.', chat_id)
         
         try:
             if raid.update_level(from_id, from_username, level):
-                return msg.send_message('Updated your level.', chat_id, None, None)
+                return msg.send_message('Updated your level.', chat_id)
         
         except Exception as e: raise
 
 def bot_command_nickname(command_params, chat_id, from_id, from_username):
     
     if not re.match('^[A-Za-z0-9]{5,32}$', command_params):
-        return msg.send_message('ERROR: Invalid nickname provided. Please try again.', chat_id, None, None)
+        return msg.send_message('ERROR: Invalid nickname provided. Please try again.', chat_id)
     
     try:
         if raid.update_nickname(from_id, from_username, command_params):
-            return msg.send_message('Updated your nickname.', chat_id, None, None)
+            return msg.send_message('Updated your nickname.', chat_id)
     
     except pymysql.err.IntegrityError as pe:
-        return msg.send_message('Sorry, your nickname has already been claimed.', chat_id, None, None)
+        return msg.send_message('Sorry, your nickname has already been claimed.', chat_id)
     
     except Exception as e: raise
 
 def bot_command_team(command_params, chat_id, from_id, from_username):
     
     if not re.match('^valor|mystic|instinct$', command_params, re.IGNORECASE):
-        return msg.send_message('ERROR: Invalid team name provided. Please specify either Valor, Mystic or Instinct.', chat_id, None, None)
+        return msg.send_message('ERROR: Invalid team name provided. Please specify either Valor, Mystic or Instinct.', chat_id)
     
     try:
         if raid.update_team(from_id, from_username, command_params):
-            return msg.send_message('Updated your team.', chat_id, None, None)
+            return msg.send_message('Updated your team.', chat_id)
     
     except Exception as e: raise
 
@@ -177,12 +173,12 @@ def bot_command_team(command_params, chat_id, from_id, from_username):
 def bot_command_raid(command_params, chat_id):
     
     if not re.match('^\d+$', command_params):
-        return msg.send_message('That is not a valid raid id.', chat_id, None)
+        return msg.send_message('That is not a valid raid id.', chat_id)
     
     raid_detail = raid.get_raid_by_id(command_params)
     if not raid_detail:
-        return msg.send_message('That is not a valid raid id.', chat_id, None)
-        
+        return msg.send_message('That is not a valid raid id.', chat_id)
+    
     tracked_message = msg.send_message(raid.format_raid_message(raid_detail), chat_id, 'MarkdownV2', True)
     
     # Only track messages for raids that have not completed
