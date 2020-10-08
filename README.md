@@ -25,6 +25,7 @@ Examples:
 ```/newraid 25-Dec-20 12:00 Christmas Pikachu @ Ockenden```
 
 2. Joining a raid
+
 Use the buttons underneath the raid information message to participate, withdraw your participation or add a plus one to your participation.
 Note: You will not be able to join the raid if the lobby is full (20 participants) or, if you are joining the remote lobby, the raid is full at 10 participants.
 
@@ -37,9 +38,11 @@ Button | Use
 ➕ | I am bringing a plus one with me.
 
 3. Commenting on a raid
+
 If you quote the raid information message you can leave a comment (up to 100 characters) which will then be made visible in the original message for others to see.
 
 4. Setting your nickname, level and team
+
 PRO TIP: You can start a conversation directly with the bot to perform these commands. This will keep the group chat clear of clutter.
 By default you will be known by your Telegram Username (if you have set one) or your Telegram First Name. We recommend you set your nickname to your in-game trainer name:
 
@@ -52,6 +55,7 @@ You can also set your trainer level (1 to 40) and team (valor, mystic or instinc
 ```/team valor```
 
 5. Editing a raid
+
 The raid creator has the ability to alter the time, title and location of a raid by quoting the raid information message and using the following commands:
 
 ```/time hh:mm```
@@ -63,11 +67,13 @@ The raid creator has the ability to alter the time, title and location of a raid
 Note: It is not possible to change the date of a raid.
 
 6. Cancelling a raid
+
 The raid creator has the ability to cancel a raid by quoting the raid information message and using the cancel command:
 
 ```/cancel```
 
 7. Duplicate the raid message
+
 You can duplicate the raid information message in any chat that the bot is a member of by using the following command:
 
 ```/raid id```
