@@ -79,3 +79,7 @@ You can duplicate the raid information message in any chat that the bot is a mem
 ```/raid id```
 
 Note: The id is the first piece of information listed in the raid information message.
+
+## Credits
+
+Until remote raiding was introduced PokeRaiderBot served our needs very well. We then created our own bot to include the ability to manage the remote lobby of a raid. Simmilar functionality has since been added to PokeRaiderBot: https://telegra.ph/PokeRaiderBot-09-16
