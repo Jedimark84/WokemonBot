@@ -173,7 +173,7 @@ def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
     
     # a) At a very basic level the raid params must be at least 10 chars.
     if len(raid_params) < 10:
-        return { "error": "Correct format is as follows (note date is optional)\n/newraid dd-Mmm-yy hh:mm Raid Title @ Raid Location" }
+        return { "error": "Correct format is as follows (note: date is optional)\n/newraid dd-Mmm-yy hh:mm Raid Title @ Raid Location" }
     
     # b) Validate the first param, it must either be a date or a time.
     raid_dict = determine_raid_date(raid_params.split(' ')[0])
@@ -211,7 +211,7 @@ def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
     # g) There should be 2 params left, the title and the location.
     #    They should be separated by a single @ symbol.
     if not sum(map(lambda x : 1 if '@' in x else 0, remaining)) == 1:
-        return { "error": "You must provide a raid title and raid location separated by a single @ symbol." }
+        return { "error": "Please provide a raid title and raid location separated by a single @ symbol." }
     
     # h) If we are here we can parse the remaining params to get the raid title and raid location
     #    Also make a note of the raid_creator info - they will have admin rights for the raid
