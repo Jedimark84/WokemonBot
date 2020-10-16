@@ -11,10 +11,7 @@ import garbage_collection as gc
 
 from datetime import datetime
 
-# ARNs can be found at the following: https://github.com/keithrozario/Klayers/blob/master/deployments/python3.8/arns/eu-west-2.csv
-# Import pymysql 0.10.1 from layer: arn:aws:lambda:eu-west-2:770693421928:layer:Klayers-python38-PyMySQL:3
-# Is this a trusted source? Maybe we should create our own pymysql layer to use. Or bundle with lambda function.
-import pymysql
+import pymysql # Uploaded as an AWS Lambda Layer
 
 ADMIN_CHAT_ID      = os.environ['ADMIN_CHAT_ID']
 CHAT_CHANNEL_LINKS = json.loads(os.environ['CHAT_CHANNEL_LINKS'])
@@ -47,6 +44,9 @@ def lambda_handler(event, context):
         
         if 'channel_post' in body:
             return chnl.channel_post_handler(body['channel_post'])
+            
+        if 'edited_message' in body:
+            return
         
         if 'message' in body:
             
@@ -61,9 +61,10 @@ def lambda_handler(event, context):
                 return reply.reply_to_message_handler(message)
             
             if 'text' in message:
-                text = message['text'].strip()
-                chat = message['chat']
-                chat_id = chat['id']
+                message_id = message['message_id']
+                text       = message['text'].strip()
+                chat       = message['chat']
+                chat_id    = chat['id']
                 
                 if 'from' in message:
                     from_obj = message['from']
@@ -80,18 +81,23 @@ def lambda_handler(event, context):
                     
                     if bot_command == '/newraid':
                         bot_command_newraid(bot_command_params, chat_id, from_id, from_username)
+                        msg.delete_message(chat_id, message_id)
                     
                     elif bot_command == '/raid':
                         bot_command_raid(bot_command_params, chat_id)
+                        msg.delete_message(chat_id, message_id)
                     
                     elif bot_command == '/nickname':
                         bot_command_nickname(bot_command_params, chat_id, from_id, from_username)
+                        msg.delete_message(chat_id, message_id)
                     
                     elif bot_command == '/level':
                         bot_command_level(bot_command_params, chat_id, from_id, from_username)
+                        msg.delete_message(chat_id, message_id)
                     
                     elif bot_command == '/team':
                         bot_command_team(bot_command_params, chat_id, from_id, from_username)
+                        msg.delete_message(chat_id, message_id)
                     
                     else:
                         return
@@ -119,7 +125,7 @@ def bot_command_newraid(raid_params, chat_id, from_id, from_username):
     raid_info = raid.create_raid(raid_params, chat_id, from_id, from_username)
     
     if raid_info.get('error'):
-        return msg.send_message('ERROR: {0}'.format(raid_info.get('error')), chat_id)
+        return msg.send_message('⚠️ Invalid newraid command received: {0}\n{1}'.format(raid_params, raid_info.get('error')), chat_id)
     
     bot_command_raid(str(raid_info.get('raid_id')), chat_id)
     
@@ -130,40 +136,40 @@ def bot_command_newraid(raid_params, chat_id, from_id, from_username):
 def bot_command_level(command_params, chat_id, from_id, from_username):
     
     if not str(command_params).isdigit():
-        return msg.send_message('ERROR: Invalid level provided. Please try again.', chat_id)
+        return msg.send_message('⚠️ Invalid level provided. Please try again.', chat_id)
     else:
         level = int(command_params)
         if not 1 <= level <= 40:
-            return msg.send_message('ERROR: Level must be between 1 and 40.', chat_id)
+            return msg.send_message('⚠️ Level must be between 1 and 40.', chat_id)
         
         try:
             if raid.update_level(from_id, from_username, level):
-                return msg.send_message('Updated your level.', chat_id)
+                    return msg.send_message('👍 Thanks {0}, I have set your level to {1}.'.format(from_username, level), chat_id)
         
         except Exception as e: raise
 
 def bot_command_nickname(command_params, chat_id, from_id, from_username):
     
     if not re.match('^[A-Za-z0-9]{5,32}$', command_params):
-        return msg.send_message('ERROR: Invalid nickname provided. Please try again.', chat_id)
+        return msg.send_message('⚠️ Invalid nickname provided. Please try again.', chat_id)
     
     try:
         if raid.update_nickname(from_id, from_username, command_params):
-            return msg.send_message('Updated your nickname.', chat_id)
+            return msg.send_message('👍 Thanks {0}, I have set your nickname to {1}.'.format(from_username, command_params), chat_id)
     
     except pymysql.err.IntegrityError as pe:
-        return msg.send_message('Sorry, your nickname has already been claimed.', chat_id)
+        return msg.send_message('⚠️ Sorry, your nickname has already been claimed.', chat_id)
     
     except Exception as e: raise
 
 def bot_command_team(command_params, chat_id, from_id, from_username):
     
     if not re.match('^valor|mystic|instinct$', command_params, re.IGNORECASE):
-        return msg.send_message('ERROR: Invalid team name provided. Please specify either Valor, Mystic or Instinct.', chat_id)
+        return msg.send_message('⚠️ Invalid team name provided. Please specify either Valor, Mystic or Instinct.', chat_id)
     
     try:
         if raid.update_team(from_id, from_username, command_params):
-            return msg.send_message('Updated your team.', chat_id)
+            return msg.send_message('👍 Thanks {0}, I have set your team to {1}.'.format(from_username, command_params.title()), chat_id)
     
     except Exception as e: raise
 
@@ -173,11 +179,11 @@ def bot_command_team(command_params, chat_id, from_id, from_username):
 def bot_command_raid(command_params, chat_id):
     
     if not re.match('^\d+$', command_params):
-        return msg.send_message('That is not a valid raid id.', chat_id)
+        return msg.send_message('⚠️ That is not a valid raid id.', chat_id)
     
     raid_detail = raid.get_raid_by_id(command_params)
     if not raid_detail:
-        return msg.send_message('That is not a valid raid id.', chat_id)
+        return msg.send_message('⚠️ That is not a valid raid id.', chat_id)
     
     tracked_message = msg.send_message(raid.format_raid_message(raid_detail), chat_id, 'MarkdownV2', True)
     
