@@ -139,8 +139,8 @@ def bot_command_level(command_params, chat_id, from_id, from_username):
         return msg.send_message('⚠️ Invalid level provided. Please try again.', chat_id)
     else:
         level = int(command_params)
-        if not 1 <= level <= 40:
-            return msg.send_message('⚠️ Level must be between 1 and 40.', chat_id)
+        if not 1 <= level <= 50:
+            return msg.send_message('⚠️ Level must be between 1 and 50.', chat_id)
         
         try:
             if raid.update_level(from_id, from_username, level):
