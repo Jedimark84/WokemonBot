@@ -144,6 +144,10 @@ def bot_command_level(command_params, chat_id, from_id, from_username):
         
         try:
             if raid.update_level(from_id, from_username, level):
+                if level == 50:
+                    msg.send_message('https://i.imgur.com/k0ITLxn.mp4', chat_id, disable_web_page_preview='false')
+                    return msg.send_message('👏 Congratulations {0} on reaching Level {1}!'.format(from_username, level), chat_id)
+                else:
                     return msg.send_message('👍 Thanks {0}, I have set your level to {1}.'.format(from_username, level), chat_id)
         
         except Exception as e: raise
