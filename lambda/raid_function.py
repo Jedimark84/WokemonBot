@@ -315,6 +315,7 @@ def format_raid_message(raid_dict):
             participation += ''.join('*{0} Joining Remotely:*\n{1}\n'.format(remote_count, remote_str) if not remote_count == 0 else '')
             participation += ''.join('*{0} Requesting an Invite:*\n{1}\n'.format(invite_count, invite_str) if not invite_count == 0 else '')
             participation += ''.join('*Dropped Out:*\n{0}\n'.format(dropout_str) if not dropout_count == 0 else '')
+            participation += ''.join('\n*⚠️The Remote Lobby is Full⚠️*\n' if (remote_count+invite_count) == 10 else '')
         
         raid_comments_dict = get_raid_comments_by_id(raid_dict.get('raid_id'))
         comments = ''

@@ -12,17 +12,24 @@ RAID_KEYBOARD  = '&reply_markup={"inline_keyboard":[[ {"text":"✅️","callback
                                                      {"text":"🚫","callback_data":4},  \
                                                      {"text":"➕","callback_data":0}]]}'
 
-def send_message(text: str, chat_id: int, parse_mode: str=None, send_keyboard: bool=False) -> urllib3.HTTPResponse:
+RAID_KEYBOARD2 = '&reply_markup={"inline_keyboard":[[ {"text":"✅️","callback_data":1},  \
+                                                     {"text":"🚫","callback_data":4},  \
+                                                     {"text":"➕","callback_data":0}]]}'
+
+def send_message(text: str, chat_id: int, parse_mode: str=None, send_keyboard: bool=False, disable_web_page_preview: str='true') -> urllib3.HTTPResponse:
 
     if text.endswith('RAID COMPLETED'):
         text = text.replace('RAID COMPLETED','')
         send_keyboard = False
     
-    url = ''.join([API_URL, 'sendMessage?disable_web_page_preview=true&text={0}&chat_id={1}'.format(quote(text), chat_id)])
+    url = ''.join([API_URL, 'sendMessage?disable_web_page_preview={0}&text={1}&chat_id={2}'.format(disable_web_page_preview, quote(text), chat_id)])
     url = ''.join([url, '' if not parse_mode else '&parse_mode={0}'.format(parse_mode)])
     
     if send_keyboard and not 'RAID CANCELLED' in text:
-        url += RAID_KEYBOARD
+        if 'The Remote Lobby is Full' in text:
+            url += RAID_KEYBOARD2
+        else:
+            url += RAID_KEYBOARD
     
     return http_get(url)
 
@@ -42,7 +49,10 @@ def edit_message(chat_id, message_id, text, parse_mode=None, send_keyboard=None)
     url = ''.join([url, '' if not parse_mode else '&parse_mode={0}'.format(parse_mode)])
     
     if send_keyboard and not 'RAID CANCELLED' in text:
-        url += RAID_KEYBOARD
+        if 'The Remote Lobby is Full' in text:
+            url += RAID_KEYBOARD2
+        else:
+            url += RAID_KEYBOARD
     
     http = urllib3.PoolManager()
     resp = http.request('GET', url)
