@@ -1,104 +1,12 @@
+import boto3
 import re
 import string
+import uuid
 
 from datetime import datetime
 from datetime import date
 
-import database as db
-
-def get_raid_by_id(raid_id: int):
-    return db.select('vw_raids', { 'raid_id': raid_id })
-
-def get_raid_participants_by_id(raid_id: int):
-    return db.select('vw_raiders', { 'raid_id': raid_id }, fetch_all=True)
-
-def get_message_tracking_by_id(raid_id: int):
-    return db.select('message_tracking', { 'raid_id': raid_id, 'completed': 0 }, fetch_all=True)
-
-def get_raid_comments_by_id(raid_id: int):
-    return db.select('raid_comments', { 'raid_id': raid_id }, fetch_all=True)
-
-def get_raider_by_id(telegram_id: int):
-    return db.select('raiders', { 'telegram_id': telegram_id })
-
-def get_raid_participation_by_id(raid_id: int, raider_id: int):
-    return db.select('raid_participants', { 'raid_id': raid_id, 'raider_id': raider_id })
-
-def get_team_by_name(team: str):
-    return db.select('teams', { 'team_name': team }, operator='LIKE')
-
-def update_team(telegram_id, username, team):
-    
-    if not get_raider_by_id(telegram_id):
-        insert_raider(telegram_id, username)
-    
-    team_dict = get_team_by_name(team)
-    if team_dict:
-        return db.update('raiders', { 'team_id': team_dict['team_id'] }, { 'telegram_id': telegram_id })
-    
-    return False
-
-def update_level(telegram_id, username, level):
-    
-    if not get_raider_by_id(telegram_id):
-        insert_raider(telegram_id, username)
-    
-    return db.update('raiders', { 'level': level }, { 'telegram_id': telegram_id })
-
-def update_nickname(telegram_id, username, nickname):
-    
-    if not get_raider_by_id(telegram_id):
-        insert_raider(telegram_id, username, nickname)
-    else:
-        return db.update('raiders', { 'nickname': escape(nickname, 32) }, { 'telegram_id': telegram_id })
-
-def update_raid_participation(raid_id, raider_id, participation_type_id):
-    return db.update('raid_participants', { 'participation_type_id': participation_type_id, 'party_count': 1 }, { 'raid_id': raid_id, 'raider_id': raider_id })
-
-def update_raid_title(raid_id, from_id, title):
-    
-    raid_dict = get_raid_by_id(raid_id)
-    if not raid_dict:
-        return { "error": "Could not find a raid with that id." }
-    else:
-        if not raid_dict.get('raid_creator_id') == int(from_id):
-            return { "error": "Only the raid creator can perform this action." }
-        else:
-            result = db.update('raids', { 'raid_title': escape(title, 50) }, { 'raid_id': raid_id })
-            if result:
-                return { "success": "Raid title has been updated." }
-            else:
-                return { "error": "Raid title was not updated." }
-    
-    return { "error": "There was a problem updating the raid title. Please try again later." }
-
-def update_raid_time(raid_id, from_id, time):
-    
-    raid_dict = get_raid_by_id(raid_id)
-    if not raid_dict:
-        return { "error": "Could not find a raid with that id." }
-    else:
-        if not raid_dict.get('raid_creator_id') == int(from_id):
-            return { "error": "Only the raid creator can perform this action." }
-        else:
-            # Verify the time is acceptable, not in the past
-            current_datetime = raid_dict.get('raid_datetime')
-            new_datetime = raid_dict.get('raid_datetime').replace(
-                hour=int(time.split(':')[0]),
-                minute=int(time.split(':')[1]),
-                second=0,
-                microsecond=0
-            )
-            if new_datetime < datetime.now():
-                return { "error": "You cannot schedule a raid for the past." }
-            else:
-                result = db.update('raids', { 'raid_datetime': new_datetime.strftime("%Y/%m/%d, %H:%M:%S") }, { 'raid_id': raid_id })
-                if result:
-                    return { "success": "Raid time has been updated." }
-                else:
-                    return { "error": "Raid time was not updated." }
-    
-    return { "error": "There was a problem updating the raid time. Please try again later." }
+import dynamo_functions as dynamo
 
 def update_raid_location(raid_id, from_id, location):
     
@@ -106,16 +14,62 @@ def update_raid_location(raid_id, from_id, location):
     if not raid_dict:
         return { "error": "Could not find a raid with that id." }
     else:
-        if not raid_dict.get('raid_creator_id') == int(from_id):
+        if not raid_dict.get('raid_detail').get('raid_creator_id') == from_id:
             return { "error": "Only the raid creator can perform this action." }
         else:
-            result = db.update('raids', { 'raid_location': escape(location, 50) }, { 'raid_id': raid_id })
+            result = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'raid_detail.raid_location', escape(location, 50))
             if result:
-                return { "success": "Raid location has been updated." }
+                return { "success": "📍 Raid location has been updated." }
             else:
                 return { "error": "Raid location was not updated." }
     
     return { "error": "There was a problem updating the raid location. Please try again later." }
+
+def update_raid_time(raid_id, from_id, time):
+    
+    raid_dict = get_raid_by_id(raid_id)
+    if not raid_dict:
+        return { "error": "Could not find a raid with that id." }
+    else:
+        if not raid_dict.get('raid_detail').get('raid_creator_id') == from_id:
+            return { "error": "Only the raid creator can perform this action." }
+        else:
+            # Verify the time is acceptable, not in the past
+            current_datetime = datetime.strptime(raid_dict.get('raid_detail').get('raid_datetime'), '%d/%m/%Y, %H:%M:%S')
+            new_datetime = current_datetime.replace(
+                hour=int(time.split(':')[0]),
+                minute=int(time.split(':')[1]),
+                second=0,
+                microsecond=0
+            )
+
+            if new_datetime < datetime.now():
+                return { "error": "You cannot schedule a raid for the past." }
+            else:
+                result = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'raid_detail.raid_datetime', new_datetime.strftime("%d/%m/%Y, %H:%M:%S"))
+                if result:
+                    return { "success": "🕗 Raid time has been updated." }
+                else:
+                    return { "error": "Raid time was not updated." }
+    
+    return { "error": "There was a problem updating the raid time. Please try again later." }
+
+def update_raid_title(raid_id, from_id, title):
+    
+    raid_dict = get_raid_by_id(raid_id)
+    if not raid_dict:
+        return { "error": "Could not find a raid with that id." }
+    else:
+        if not raid_dict.get('raid_detail').get('raid_creator_id') == from_id:
+            return { "error": "Only the raid creator can perform this action." }
+        else:
+            result = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'raid_detail.raid_title', escape(title, 50))
+            if result:
+                return { "success": "📃 Raid title has been updated." }
+            else:
+                return { "error": "Raid title was not updated." }
+    
+    return { "error": "There was a problem updating the raid title. Please try again later." }
 
 def cancel_raid(raid_id, from_id):
     
@@ -123,10 +77,10 @@ def cancel_raid(raid_id, from_id):
     if not raid_dict:
         return { "error": "Could not find a raid with that id." }
     else:
-        if not raid_dict.get('raid_creator_id') == int(from_id):
+        if not raid_dict.get('raid_detail').get('raid_creator_id') == from_id:
             return { "error": "Only the raid creator can perform this action." }
         else:
-            result = db.update('raids', { 'cancelled': 1 }, { 'raid_id': raid_id })
+            result = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'cancelled', True)
             if result:
                 return { "success": "Raid has been cancelled." }
             else:
@@ -134,38 +88,207 @@ def cancel_raid(raid_id, from_id):
     
     return { "error": "There was a problem cancelling the raid. Please try again later." }
 
-def increment_party_count(raid_id, raider_id):
-    db.update_increment('raid_participants', 'party_count', { 'raid_id': raid_id, 'raider_id': raider_id })
-    return True # TODO: return from calling function instead of having to return True
+def get_raid_by_id(raid_id: int):
+    return dynamo.get_item('wokemon_raids', 'raid_id', raid_id)
 
-def insert_raid(raid_dict):
-    
-    # Step 1: Verify the user exists in the raiders table
-    #         If they don't then create them!
-    if not get_raider_by_id(raid_dict.get('raid_creator_id')):
-        insert_raider(raid_dict.get('raid_creator_id'), raid_dict.get('raid_creator_username'))
+def get_raid_comments_by_id(raid_id: int):
+    return dynamo.get_item('wokemon_raids', 'raid_id', int(raid_id), 'raid_comments')
 
-    return db.insert('raids', { 'raid_creator_id': raid_dict.get('raid_creator_id'), \
-                                'raid_datetime': raid_dict.get('raid_datetime').strftime("%Y/%m/%d, %H:%M:%S"), \
-                                'raid_title': escape(raid_dict.get('raid_title'), 50), \
-                                'raid_location': escape(raid_dict.get('raid_location'), 50) \
-                                }, 'raid_id')
+def insert_raid_comment(comment, username, raid_id,):
+    return dynamo.list_append('wokemon_raids', 'raid_id', raid_id, 'raid_comments', "{0}: {1}".format(escape(username, 32), escape(comment, 200)))
+
+def get_message_tracking_by_id(raid_id: int):
+    return dynamo.get_item('wokemon_raids', 'raid_id', int(raid_id), 'message_tracking')
 
 def insert_message_tracking(raid_id, chat_id, message_id):
-    return db.insert('message_tracking', { 'raid_id': raid_id, 'chat_id': chat_id, 'message_id': message_id } )
+    return dynamo.list_append('wokemon_raids', 'raid_id', raid_id, 'message_tracking', {"{0}".format(chat_id) : message_id})
 
-def insert_raid_comment(comment, username, raid_id, comment_id):
-    return db.insert('raid_comments', { 'comment_id': comment_id, 'raid_id': raid_id, 'username': escape(username, 32), 'comment': escape(comment, 200) } )
+def join_raid(from_object, raid_id, participation_type_id):
 
-def insert_raid_participation(raid_id, raider_id, participation_type_id):
-    return db.insert('raid_participants', { 'raid_id': raid_id, 'raider_id': raider_id, 'participation_type_id': participation_type_id, 'party_count': 1 } )
+    # Step 1: Verify the user exists in the raiders table
+    #         If they don't then create them!
+    if not dynamo.get_item('wokemon_users', 'telegram_id', from_object['id']):
+        dynamo.update_item('wokemon_users', 'telegram_id', from_object['id'], 'telegram_username', get_username(from_object))
+    
+    # Get raid participation details
+    raid_dict = get_raid_participants_by_id(raid_id)
+    
+    # Step 2: If this is not a drop out request, is there space in the raid for another user?
+    if participation_type_id < 4 and raid_dict:
 
-def insert_raider(telegram_id, username, nickname=None):
-    if nickname:
-        return db.insert('raiders', { 'telegram_id': telegram_id, 'username': escape(username, 32), 'nickname': escape(nickname, 32) } )
+        # Count physical raiders and remote raiders
+        physical_count = 0
+        remote_count = 0
+        
+        for participant in raid_dict:
+            for k, v in participant.items():
+                if v['participation_type'] == 1:
+                    physical_count += (1+v.get('additional', 0))
+                elif v['participation_type'] == 2 or v['participation_type'] == 3:
+                    remote_count += (1+v.get('additional', 0))
+
+        # If there are already 20 people going, then the raid is full
+        if (physical_count + remote_count) >= 20:
+            # Raid lobby is full
+            return False
+
+        # If the user will be joining the remote lobby then check there are not 10 in it already
+        if participation_type_id == 2 or participation_type_id == 3:
+            if remote_count >= 10:
+                # Remote lobby is full
+                return False
+
+    # There is space available in the raid!
+    
+    # Step 3: See if the user is already participating in this raid
+    p = False
+    list_index = 0
+    if raid_dict:
+        for participant in raid_dict:
+            if participant.get('telegram_id_{0}'.format(str(from_object['id']))):
+                p = participant.get('telegram_id_{0}'.format(str(from_object['id'])))
+            else:
+                list_index+=1
+
+    # If they are not participating already...
+    if not p:
+        # ... check the user is not trying to drop out of a raid they are not even ticked in for
+        # ... or that they have pressed the +1 button
+        if not (participation_type_id == 0 or participation_type_id == 4):
+            # Else we can add them to the raid
+            return dynamo.list_append('wokemon_raids', 'raid_id', raid_id, 'raid_participants_list', {"telegram_id_{0}".format(from_object['id']): {"participation_type": participation_type_id}})
+    
+    # If the user is already participating...
     else:
-        return db.insert('raiders', { 'telegram_id': telegram_id, 'username': escape(username, 32) } )
+        existing_participation_type = p.get('participation_type')
+        # ... ignore duplicate requests
+        if existing_participation_type == participation_type_id:
+            return False
 
+        # ... if they aren't a drop out, they can bring a plus 1?
+        elif participation_type_id == 0 and not existing_participation_type == 4:
+            # ... However, if they are in the remote lobby, then check there is space
+            if existing_participation_type == 2 or existing_participation_type == 3:
+                if remote_count >= 10:
+                    return False
+
+            return dynamo.increment_list('wokemon_raids', 'raid_id', raid_id, list_index, from_object['id'])
+        
+        # ... else they must be changing their participation type
+        else:
+            # if they were bringing additional people previously, remove these
+            if 'additional' in p:
+                dynamo.remove_additional('wokemon_raids', 'raid_id', raid_id, list_index, from_object['id'])
+
+            return dynamo.update_raid_participation('wokemon_raids', 'raid_id', raid_id, list_index, from_object['id'], participation_type_id)
+    
+    # I don't think it should be possible to get to this point
+    return False
+    
+def get_raid_participants_by_id(raid_id: int):
+    return dynamo.get_item('wokemon_raids', 'raid_id', int(raid_id), 'raid_participants_list')
+
+def return_team_symbol(team_name: str):
+
+    if team_name.casefold() == 'Valor'.casefold():
+        return '🔴'
+    elif team_name.casefold() == 'Mystic'.casefold():
+        return '🔵'
+    elif team_name.casefold() == 'Instinct'.casefold():
+        return '🟡'
+    
+    return '?'
+
+def format_raider(telegram_id, participant_dict):
+
+    telegram_id = telegram_id.replace('telegram_id_', '')
+    user_dict = dynamo.get_item('wokemon_users', 'telegram_id', telegram_id)
+
+    player_str = '[{0}](tg://user?id={1})'.format(''.join([user_dict.get('telegram_username') if not user_dict.get('trainer_name') else user_dict.get('trainer_name')]), user_dict.get('telegram_id'))
+    player_str += ''.join(['' if not user_dict.get('trainer_team') else ' {0}'.format(return_team_symbol(user_dict.get('trainer_team')))])
+    player_str += ''.join(['' if not user_dict.get('trainer_level') else ' {0}'.format(str(user_dict.get('trainer_level')))])
+    player_str = ''.join(['{0} {1}'.format(player_str, 'with {0} other\(s\)'.format(participant_dict.get('additional'))) if 'additional' in participant_dict else player_str])
+
+    return player_str
+
+def format_raid_message(raid_dict):
+    
+    print("In format_raid_message")
+    
+    raid_detail = raid_dict.get('raid_detail')
+    raid_participants_list = raid_dict.get('raid_participants_list')
+    raid_comments = raid_dict.get('raid_comments')
+    
+    raid_datetime = datetime.strptime(raid_detail.get('raid_datetime'), '%d/%m/%Y, %H:%M:%S')
+    if raid_datetime.date() == datetime.today().date():
+        raid_datetime_string = raid_datetime.strftime("%H:%M")
+    else:
+        raid_datetime_string = raid_datetime.strftime("%d\-%b\-%y\, %H:%M")
+    
+    if raid_detail.get('gym_name'):
+        raid_location = '📍[{0}](https://www.google.com/maps/search/?api=1&query={1},{2})'.format(raid_detail.get('gym_name'), raid_detail.get('latitude'), raid_detail.get('longitude'))
+    else:
+        raid_location = raid_detail.get('raid_location')
+    
+    if raid_dict.get('cancelled'):
+        final_string = '❌ RAID CANCELLED ❌'
+    else:
+        
+        if not raid_participants_list:
+            participation = 'There are currently no participants for this raid\.'
+        
+        else:
+            physical_count = 0
+            remote_count   = 0
+            invite_count   = 0
+            dropout_count  = 0
+            
+            # Iterate through participants to get their status
+            for p in raid_participants_list:
+                for k, v in p.items():
+                    if v['participation_type']==1:
+                        physical_str = ''.join(['{0}\n{1}'.format(physical_str, format_raider(k, v)) if not physical_count == 0 else format_raider(k, v)])
+                        physical_count += (1+v.get('additional')) if 'additional' in v else 1
+                    
+                    elif v['participation_type'] == 2:
+                        remote_str = ''.join(['{0}\n{1}'.format(remote_str, format_raider(k, v)) if not remote_count == 0 else format_raider(k, v)])
+                        remote_count += (1+v.get('additional')) if 'additional' in v else 1
+                    
+                    elif v['participation_type'] == 3:
+                        invite_str = ''.join(['{0}\n{1}'.format(invite_str, format_raider(k, v)) if not invite_count == 0 else format_raider(k, v)])
+                        invite_count += (1+v.get('additional')) if 'additional' in v else 1
+                    
+                    elif v['participation_type'] == 4:
+                        dropout_str = ''.join(['{0}\n{1}'.format(dropout_str, format_raider(k, v)) if not dropout_count == 0 else format_raider(k, v)])
+                        dropout_count += v.get('additional') if 'additional' in v else 1
+            
+            participation = ''.join('*{0} Going In Person:*\n{1}\n'.format(physical_count, physical_str) if not physical_count == 0 else '')
+            participation += ''.join('*{0} Joining Remotely:*\n{1}\n'.format(remote_count, remote_str) if not remote_count == 0 else '')
+            participation += ''.join('*{0} Requesting an Invite:*\n{1}\n'.format(invite_count, invite_str) if not invite_count == 0 else '')
+            participation += ''.join('*Dropped Out:*\n{0}\n'.format(dropout_str) if not dropout_count == 0 else '')
+            participation += ''.join('\n*⚠️The Remote Lobby is Full⚠️*\n' if (remote_count+invite_count) == 10 else '')
+        
+        comments = ''
+        if raid_comments:
+            for c in raid_comments:
+                comments += '{0}: _{1}_\n'.format(c.split(":", 1)[0].strip(), c.split(":", 1)[-1].strip())
+        
+        completed = str()
+        if raid_dict.get('completed'):
+            completed = 'RAID COMPLETED'
+        
+        final_string = '{0}\n{1}\n{2}'.format(participation, comments, completed)
+    print("Completed format_raid_message")
+    ## IT IS VERY IMPORTANT THAT THE MESSAGE STARTS WITH 'Raid {raid_id};'
+    ## IT IS USED TO PARSE CALLBACK RESPONSES TO FIGURE OUT THE RAID ID
+    return "*Raid* {0}; *Organiser:* {1}\n*Time & Title:* {2} \- {3}\n*Location:* {4}\n\n{5}".format(
+                                            raid_dict.get('raid_id'), \
+                                            '[{0}](tg://user?id={1})'.format(raid_detail.get('raid_creator_username'), raid_detail.get('raid_creator_id')),
+                                            raid_datetime_string,
+                                            raid_detail.get('raid_title'),
+                                            raid_location,
+                                            final_string
+                                        )
 
 def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
     
@@ -203,6 +326,9 @@ def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
     if raid_dict.get('raid_datetime') < datetime.now():
         return { "error": "You cannot schedule a raid for the past." }
     
+    # Convert the datetime to a string for dynamodb
+    raid_dict['raid_datetime'] = raid_dict.get('raid_datetime').strftime("%d/%m/%Y, %H:%M:%S")
+    
     # f) Clear up some variables we no longer need
     raid_dict.pop('raid_date')
     raid_dict.pop('raid_time')
@@ -223,6 +349,18 @@ def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
     # Stage 2: We have the information we need to create a raid.
     #          So lets do that and return the result back to the handler.
     return insert_raid(raid_dict)
+
+def insert_raid(raid_dict):
+    
+    counter_value = dynamo.get_item('wokemon_counter', 'counter_id', 0, 'counter_value')
+    raid_id = counter_value+1
+    dynamo.update_item('wokemon_counter', 'counter_id', 0, 'counter_value', raid_id)
+    
+    response = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'raid_detail', raid_dict)
+    
+    raid_dict["raid_id"] = raid_id
+    
+    return raid_dict
 
 def determine_raid_date(input):
     
@@ -257,176 +395,27 @@ def determine_raid_time(input):
     else:
         return False
 
-def format_raider(raider_dict):
-    
-    player_str = '[{0}](tg://user?id={1})'.format(''.join([raider_dict.get('username') if not raider_dict.get('nickname') else raider_dict.get('nickname')]), raider_dict.get('raider_id'))
-    player_str += ''.join(['' if not raider_dict.get('team_id') else ' {0}'.format(raider_dict.get('team_symbol'))])
-    player_str += ''.join(['' if not raider_dict.get('level') else ' {0}'.format(str(raider_dict.get('level')))])
-    player_str = ''.join(['{0} {1}'.format(player_str, 'with {0} other\(s\)'.format(raider_dict.get('party_count')-1)) if not raider_dict.get('party_count') == 1 else player_str])
-    
-    return player_str
-
-def format_raid_message(raid_dict):
-    
-    if raid_dict.get('raid_datetime').date() == datetime.today().date():
-        raid_datetime_string = raid_dict.get('raid_datetime').strftime("%H:%M")
-    else:
-        raid_datetime_string = raid_dict.get('raid_datetime').strftime("%d\-%b\-%y\, %H:%M")
-    
-    if raid_dict.get('gym_name'):
-        raid_location = '📍[{0}](https://www.google.com/maps/search/?api=1&query={1},{2})'.format(raid_dict.get('gym_name'), raid_dict.get('latitude'), raid_dict.get('longitude'))
-    else:
-        raid_location = raid_dict.get('raid_location')
-    
-    if raid_dict.get('cancelled') == 1:
-        final_string = '❌ RAID CANCELLED ❌'
-    else:
-        
-        raid_participant_dict = get_raid_participants_by_id(raid_dict.get('raid_id'))
-        if not raid_participant_dict:
-            participation = 'There are currently no participants for this raid\.'
-        
-        else:
-            physical_count = 0
-            remote_count   = 0
-            invite_count   = 0
-            dropout_count  = 0
-            
-            # Iterate through participants to get their status
-            for p in raid_participant_dict:
-                
-                if p.get('participation_type_id') == 1:
-                    physical_str = ''.join(['{0}\n{1}'.format(physical_str, format_raider(p)) if not physical_count == 0 else format_raider(p)])
-                    physical_count += p.get('party_count')
-                
-                elif p.get('participation_type_id') == 2:
-                    remote_str = ''.join(['{0}\n{1}'.format(remote_str, format_raider(p)) if not remote_count == 0 else format_raider(p)])
-                    remote_count += p.get('party_count')
-                
-                elif p.get('participation_type_id') == 3:
-                    invite_str = ''.join(['{0}\n{1}'.format(invite_str, format_raider(p)) if not invite_count == 0 else format_raider(p)])
-                    invite_count += p.get('party_count')
-                
-                elif p.get('participation_type_id') == 4:
-                    dropout_str = ''.join(['{0}\n{1}'.format(dropout_str, format_raider(p)) if not dropout_count == 0 else format_raider(p)])
-                    dropout_count += p.get('party_count')
-            
-            participation = ''.join('*{0} Going In Person:*\n{1}\n'.format(physical_count, physical_str) if not physical_count == 0 else '')
-            participation += ''.join('*{0} Joining Remotely:*\n{1}\n'.format(remote_count, remote_str) if not remote_count == 0 else '')
-            participation += ''.join('*{0} Requesting an Invite:*\n{1}\n'.format(invite_count, invite_str) if not invite_count == 0 else '')
-            participation += ''.join('*Dropped Out:*\n{0}\n'.format(dropout_str) if not dropout_count == 0 else '')
-            participation += ''.join('\n*⚠️The Remote Lobby is Full⚠️*\n' if (remote_count+invite_count) == 10 else '')
-        
-        raid_comments_dict = get_raid_comments_by_id(raid_dict.get('raid_id'))
-        comments = ''
-        if raid_comments_dict:
-            for c in raid_comments_dict:
-                comments += '{0}: _{1}_\n'.format(c['username'], c['comment'])
-        
-        completed = str()
-        if raid_dict.get('completed') == 1:
-            completed = 'RAID COMPLETED'
-        
-        final_string = '{0}\n{1}\n{2}'.format(participation, comments, completed)
-    
-    # IT IS VERY IMPORTANT THAT THE MESSAGE STARTS WITH 'Raid {raid_id};'
-    # IT IS USED TO PARSE CALLBACK RESPONSES TO FIGURE OUT THE RAID ID
-    return "*Raid* {0}; *Organiser:* {1}\n*Time & Title:* {2} \- {3}\n*Location:* {4}\n\n{5}".format(
-                                            raid_dict.get('raid_id'), \
-                                            '[{0}](tg://user?id={1})'.format(''.join([raid_dict.get('raid_creator_username') if not raid_dict.get('raid_creator_nickname') else raid_dict.get('raid_creator_nickname')]), raid_dict.get('raid_creator_id')),
-                                            raid_datetime_string,
-                                            raid_dict.get('raid_title'),
-                                            raid_location,
-                                            final_string
-                                        )
-
-def join_raid(from_object, raid_id, participation_type_id):
-    
-    # Step 1: Verify the user exists in the raiders table
-    #         If they don't then create them!
-    if not get_raider_by_id(from_object['id']):
-        insert_raider(from_object['id'], get_username(from_object))
-    
-    # Step 2: If this is not a drop out request, is there space in the raid for another user?
-    if int(participation_type_id) < 4:
-        raid_dict = get_raid_participants_by_id(raid_id)
-        if raid_dict:
-            # Count physical raiders and remote raiders
-            physical_count = 0
-            remote_count = 0
-            
-            for r in raid_dict:
-                if r['participation_type_id'] == 1:
-                    physical_count += r['party_count']
-                elif r['participation_type_id'] == 2 or r['participation_type_id'] == 3:
-                    remote_count += r['party_count']
-            
-            # If there are already 20 people going, then the raid is full
-            if (physical_count + remote_count) >= 20:
-                # Raid lobby is full
-                return False
-            
-            # If the user will be joining the remote lobby then check there are not 10 in it already
-            if int(participation_type_id) == 2 or int(participation_type_id) == 3:
-                if remote_count >= 10:
-                    # Remote lobby is full
-                    return False
-    
-    # There is space available in the raid!
-    
-    # Step 3: See if the user is already participating in this raid
-    p = get_raid_participation_by_id(raid_id, from_object['id'])
-    # If they are not participating already...
-    if not p:
-        # ... check the user is not trying to drop out of a raid they are not even ticked in for
-        # ... or that they have pressed the +1 button
-        if not (participation_type_id == '0' or participation_type_id == '4'):
-            # Else we can add them to the raid
-            return insert_raid_participation(raid_id, from_object['id'], participation_type_id)
-    
-    # If the user is already participating...
-    else:
-        # ... ignore duplicate requests
-        if p.get('participation_type_id') == int(participation_type_id):
-            return False
-        
-        # ... if they aren't a drop out, they can bring a plus 1?
-        elif int(participation_type_id) == 0 and not p['participation_type_id'] == 4:
-            # ... However, if they are in the remote lobby, then check there is space
-            if p['participation_type_id'] == 2 or p['participation_type_id'] == 3:
-                if remote_count >= 10:
-                    return False
-            
-            return increment_party_count(raid_id, from_object['id'])
-        
-        # ... else they must be changing their participation type
-        else:
-            return update_raid_participation(raid_id, from_object['id'], participation_type_id)
-    
-    # I don't think it should be possible to get to this point
-    return False
-
 def escape(input, max_length):
     
     return input[:max_length].translate(str.maketrans({
-                                            "_": r"\\_",
-                                            "*": r"\\*",
-                                            "[": r"\\[",
-                                            "]": r"\\]",
-                                            "(": r"\\(",
-                                            ")": r"\\)",
-                                            "~": r"\\~",
-                                            "`": r"\\`",
-                                            ">": r"\\>",
-                                            "#": r"\\#",
-                                            "+": r"\\+",
-                                            "-": r"\\-",
-                                            "=": r"\\=",
-                                            "|": r"\\|",
-                                            "{": r"\\{",
-                                            "}": r"\\}",
-                                            ".": r"\\.",
-                                            "!": r"\\!",
+                                            "_": r"\_",
+                                            "*": r"\*",
+                                            "[": r"\[",
+                                            "]": r"\]",
+                                            "(": r"\(",
+                                            ")": r"\)",
+                                            "~": r"\~",
+                                            "`": r"\`",
+                                            ">": r"\>",
+                                            "#": r"\#",
+                                            "+": r"\+",
+                                            "-": r"\-",
+                                            "=": r"\=",
+                                            "|": r"\|",
+                                            "{": r"\{",
+                                            "}": r"\}",
+                                            ".": r"\.",
+                                            "!": r"\!",
                                             "'": r"\'"
                                         })).strip()
 

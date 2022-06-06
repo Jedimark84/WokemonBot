@@ -1,12 +1,10 @@
-import os
 import re
 import string
 
 import message_functions as msg
 import raid_function as raid
 
-ADMIN_CHAT_ID       = os.environ['ADMIN_CHAT_ID']
-RESPOND_ONLY_TO_IDS = [555076590, 1353986583] # IDs for @Wokemon_bot and @Wokedev_bot
+RESPOND_ONLY_TO_IDS = [555076590, 5365883597, 1353986583] # IDs for @Wokemon_bot, @WokemonNoSQL and @Wokedev_bot
 SUPPORTED_COMMANDS  = ['cancel', 'time', 'title', 'location']
 
 def reply_to_message_handler(message: dict):
@@ -37,16 +35,15 @@ def reply_to_message_handler(message: dict):
         # I only respond to raid information messages
         if re.match('^Raid\s(\d)+$', text_split):
             
-            raid_id       = text_split.split(' ')[1]
-            chat_id       = chat['id']
-            from_id       = from_obj['id']
+            raid_id       = int(text_split.split(' ')[1])
+            chat_id       = int(chat['id'])
+            from_id       = int(from_obj['id'])
             from_username = raid.get_username(from_obj)
 
             # I only respond to active raids (i.e. not cancelled or completed)
-            r = raid.get_raid_by_id(raid_id)
-            if r['cancelled'] == 1 or r['completed'] == 1:
+            if (any(x in raid.get_raid_by_id(raid_id) for x in ['cancelled', 'completed'])):
                 return
-            
+
             # Is the reply a bot command?
             if reply_text.startswith('/'):
                 
@@ -79,15 +76,9 @@ def reply_to_message_handler(message: dict):
 def bot_command_cancel(message_id, chat_id, raid_id, from_id):
     
     response = raid.cancel_raid(raid_id, from_id)
-    
     if response.get('success'):
-        formatted_message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
-        tracking = raid.get_message_tracking_by_id(raid_id)
-        for t in tracking:
-            msg.edit_message(t.get('chat_id'),t.get('message_id'),formatted_message,'MarkdownV2', True)
-        
-        return msg.send_message('Raid Cancelled.', chat_id, None)
-    
+        update_tracked_messages(raid_id)
+        return msg.send_message('❌ Raid {0} has been cancelled.'.format(raid_id), chat_id, None)
     else:
         return msg.send_message('ERROR: {0}'.format(response.get('error')), chat_id, None)
 
@@ -98,6 +89,7 @@ def bot_command_time(message_id, chat_id, raid_id, from_id, from_username, time_
     
     else:
         response = raid.update_raid_time(raid_id, from_id, time_param)
+        print("Got response: {0}".format(response))
         
         if response.get('success'):
             leave_comment_and_update_messages(message_id, raid_id, from_username, 'Updated the raid time to {0}'.format(time_param))
@@ -132,8 +124,24 @@ def bot_command_location(message_id, chat_id, raid_id, from_id, from_username, l
 
 def leave_comment_and_update_messages(message_id, raid_id, from_username, comment):
     
-    if raid.insert_raid_comment(comment.strip()[:200].strip(), from_username, raid_id, message_id):
-        formatted_message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
-        tracking = raid.get_message_tracking_by_id(raid_id)
-        for t in tracking:
-            msg.edit_message(t.get('chat_id'), t.get('message_id'), formatted_message, 'MarkdownV2', True)
+    if raid.insert_raid_comment(comment.strip()[:200].strip(), from_username, raid_id):
+        update_tracked_messages(raid_id)
+
+def update_tracked_messages(raid_id: int, allow_delete=False):
+    
+    message_tracking = raid.get_message_tracking_by_id(raid_id)
+    
+    if not message_tracking:
+        return
+    
+    message = raid.format_raid_message(raid.get_raid_by_id(raid_id))
+
+    for t in message_tracking:
+        first_pair = next(iter((t.items())))
+        msg.edit_message(first_pair[0], first_pair[1], message, 'MarkdownV2', True)
+        
+        if allow_delete:
+            chat = msg.getChat(first_pair[0])
+            if chat.get('result'):
+                if chat['result']['type'] == 'channel':
+                    msg.delete_message(first_pair[0], first_pair[1])

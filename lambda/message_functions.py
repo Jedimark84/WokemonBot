@@ -1,6 +1,6 @@
-import urllib3
 import json
 import os
+import urllib3
 
 from urllib.parse import quote
 
@@ -15,6 +15,9 @@ RAID_KEYBOARD  = '&reply_markup={"inline_keyboard":[[ {"text":"✅️","callback
 RAID_KEYBOARD2 = '&reply_markup={"inline_keyboard":[[ {"text":"✅️","callback_data":1},  \
                                                      {"text":"🚫","callback_data":4},  \
                                                      {"text":"➕","callback_data":0}]]}'
+                                                     
+RAID_KEYBOARD3  = '&reply_markup={"inline_keyboard":[[ {"text":"✅️ Going in Person","callback_data":1},  \
+                                                     {"text":"📍 Joining Remotely","callback_data":2}]]}'
 
 def send_message(text: str, chat_id: int, parse_mode: str=None, send_keyboard: bool=False, disable_web_page_preview: str='true') -> urllib3.HTTPResponse:
 
@@ -28,6 +31,8 @@ def send_message(text: str, chat_id: int, parse_mode: str=None, send_keyboard: b
     if send_keyboard and not 'RAID CANCELLED' in text:
         if 'The Remote Lobby is Full' in text:
             url += RAID_KEYBOARD2
+        elif 'There are currently no participants for this raid' in text:
+            url += RAID_KEYBOARD3
         else:
             url += RAID_KEYBOARD
     
