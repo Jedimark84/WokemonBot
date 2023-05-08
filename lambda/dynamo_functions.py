@@ -3,11 +3,13 @@ import time
 
 from decimal import Decimal
 
-def scan_attribute_not_exists(table_name, attribute):
+def init_boto3_resource():
+    return boto3.resource('dynamodb')
+
+def scan_attribute_not_exists(table_name, attribute, client=boto3.resource('dynamodb')):
 
     start_time = time.time()
 
-    client = boto3.resource('dynamodb')
     table = client.Table(table_name)
 
     response = table.scan(
@@ -32,11 +34,10 @@ def scan_attribute_not_exists(table_name, attribute):
     
     return data
 
-def get_item(table_name, partition_key_name, partition_key_value, optional_field_name=None):
+def get_item(table_name, partition_key_name, partition_key_value, optional_field_name=None, client=boto3.resource('dynamodb')):
     
     start_time = time.time()
 
-    client = boto3.resource('dynamodb')
     table = client.Table(table_name)
 
     # If partition_key_value can be cast to a Decimal then do so
@@ -62,11 +63,10 @@ def get_item(table_name, partition_key_name, partition_key_value, optional_field
 
     return response['Item']
 
-def update_item(table_name, partition_key_name, partition_key_value, field_name, field_value):
+def update_item(table_name, partition_key_name, partition_key_value, field_name, field_value, client=boto3.resource('dynamodb')):
     
     start_time = time.time()
 
-    client = boto3.resource('dynamodb')
     table = client.Table(table_name)
 
     # If partition_key_value can be cast to a Decimal then do so
@@ -86,13 +86,15 @@ def update_item(table_name, partition_key_name, partition_key_value, field_name,
     
     print(f"--- {round(time.time() - start_time, 2)} seconds for update_item({table_name}, {partition_key_name}, {partition_key_value}, {field_name}, {field_value}) ---")
 
-    return True
+    if response['ResponseMetadata']['HTTPStatusCode'] == 200 and 'Attributes' in response:
+        return response
+    
+    return False
 
-def list_append(table_name, partition_key_name, partition_key_value, field_name, field_value):
+def list_append(table_name, partition_key_name, partition_key_value, field_name, field_value, client=boto3.resource('dynamodb')):
     
     start_time = time.time()
 
-    client = boto3.resource('dynamodb')
     table = client.Table(table_name)
 
     # If partition_key_value can be cast to a Decimal then do so
@@ -122,11 +124,10 @@ def list_append(table_name, partition_key_name, partition_key_value, field_name,
     return False
 
 # TODO: Can we make these next 3 functions more generic...
-def increment_list(table_name, partition_key_name, partition_key_value, list_index, telegram_id):
+def increment_list(table_name, partition_key_name, partition_key_value, list_index, telegram_id, client=boto3.resource('dynamodb')):
     
     start_time = time.time()
     
-    client = boto3.resource('dynamodb')
     table = client.Table(table_name)
 
     # If partition_key_value can be cast to a Decimal then do so
@@ -156,11 +157,10 @@ def increment_list(table_name, partition_key_name, partition_key_value, list_ind
     
     return False
 
-def update_raid_participation(table_name, partition_key_name, partition_key_value, list_index, telegram_id, participation_type):
+def update_raid_participation(table_name, partition_key_name, partition_key_value, list_index, telegram_id, participation_type, client=boto3.resource('dynamodb')):
     
     start_time = time.time()
 
-    client = boto3.resource('dynamodb')
     table = client.Table(table_name)
 
     # If partition_key_value can be cast to a Decimal then do so
@@ -189,11 +189,11 @@ def update_raid_participation(table_name, partition_key_name, partition_key_valu
     
     return False
 
-def remove_additional(table_name, partition_key_name, partition_key_value, list_index, telegram_id):
+def remove_additional(table_name, partition_key_name, partition_key_value, list_index, telegram_id, client=boto3.resource('dynamodb')):
     
+    print(f"In remove_additional({table_name}, {partition_key_name}, {partition_key_value}, {list_index}, {telegram_id})")
     start_time = time.time()
 
-    client = boto3.resource('dynamodb')
     table = client.Table(table_name)
 
     # If partition_key_value can be cast to a Decimal then do so

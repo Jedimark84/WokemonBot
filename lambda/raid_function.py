@@ -3,21 +3,20 @@ import re
 import string
 import uuid
 
-from datetime import datetime
-from datetime import date
+from datetime import date, datetime
 
 import dynamo_functions as dynamo
 
-def update_raid_location(raid_id, from_id, location):
+def update_raid_location(raid_id, from_id, location, client):
     
-    raid_dict = get_raid_by_id(raid_id)
+    raid_dict = get_raid_by_id(raid_id, client)
     if not raid_dict:
         return { "error": "Could not find a raid with that id." }
     else:
         if not raid_dict.get('raid_detail').get('raid_creator_id') == from_id:
             return { "error": "Only the raid creator can perform this action." }
         else:
-            result = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'raid_detail.raid_location', escape(location, 50))
+            result = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'raid_detail.raid_location', escape(location, 50), client)
             if result:
                 return { "success": "📍 Raid location has been updated." }
             else:
@@ -25,9 +24,9 @@ def update_raid_location(raid_id, from_id, location):
     
     return { "error": "There was a problem updating the raid location. Please try again later." }
 
-def update_raid_time(raid_id, from_id, time):
+def update_raid_time(raid_id, from_id, time, client):
     
-    raid_dict = get_raid_by_id(raid_id)
+    raid_dict = get_raid_by_id(raid_id, client)
     if not raid_dict:
         return { "error": "Could not find a raid with that id." }
     else:
@@ -46,7 +45,7 @@ def update_raid_time(raid_id, from_id, time):
             if new_datetime < datetime.now():
                 return { "error": "You cannot schedule a raid for the past." }
             else:
-                result = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'raid_detail.raid_datetime', new_datetime.strftime("%d/%m/%Y, %H:%M:%S"))
+                result = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'raid_detail.raid_datetime', new_datetime.strftime("%d/%m/%Y, %H:%M:%S"), client)
                 if result:
                     return { "success": "🕗 Raid time has been updated." }
                 else:
@@ -54,16 +53,16 @@ def update_raid_time(raid_id, from_id, time):
     
     return { "error": "There was a problem updating the raid time. Please try again later." }
 
-def update_raid_title(raid_id, from_id, title):
+def update_raid_title(raid_id, from_id, title, client):
     
-    raid_dict = get_raid_by_id(raid_id)
+    raid_dict = get_raid_by_id(raid_id, client)
     if not raid_dict:
         return { "error": "Could not find a raid with that id." }
     else:
         if not raid_dict.get('raid_detail').get('raid_creator_id') == from_id:
             return { "error": "Only the raid creator can perform this action." }
         else:
-            result = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'raid_detail.raid_title', escape(title, 50))
+            result = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'raid_detail.raid_title', escape(title, 50), client)
             if result:
                 return { "success": "📃 Raid title has been updated." }
             else:
@@ -71,16 +70,16 @@ def update_raid_title(raid_id, from_id, title):
     
     return { "error": "There was a problem updating the raid title. Please try again later." }
 
-def cancel_raid(raid_id, from_id):
+def cancel_raid(raid_id, from_id, client):
     
-    raid_dict = get_raid_by_id(raid_id)
+    raid_dict = get_raid_by_id(raid_id, client)
     if not raid_dict:
         return { "error": "Could not find a raid with that id." }
     else:
         if not raid_dict.get('raid_detail').get('raid_creator_id') == from_id:
             return { "error": "Only the raid creator can perform this action." }
         else:
-            result = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'cancelled', True)
+            result = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'cancelled', True, client)
             if result:
                 return { "success": "Raid has been cancelled." }
             else:
@@ -88,30 +87,33 @@ def cancel_raid(raid_id, from_id):
     
     return { "error": "There was a problem cancelling the raid. Please try again later." }
 
-def get_raid_by_id(raid_id: int):
-    return dynamo.get_item('wokemon_raids', 'raid_id', raid_id)
+def get_raid_by_id(raid_id: int, client):
+    return dynamo.get_item('wokemon_raids', 'raid_id', raid_id, client=client)
 
-def get_raid_comments_by_id(raid_id: int):
-    return dynamo.get_item('wokemon_raids', 'raid_id', int(raid_id), 'raid_comments')
+def get_raid_comments_by_id(raid_id: int, client):
+    return dynamo.get_item('wokemon_raids', 'raid_id', int(raid_id), 'raid_comments', client=client)
 
-def insert_raid_comment(comment, username, raid_id,):
-    return dynamo.list_append('wokemon_raids', 'raid_id', raid_id, 'raid_comments', "{0}: {1}".format(escape(username, 32), escape(comment, 200)))
+def insert_raid_comment(comment, username, raid_id, client):
+    return dynamo.list_append('wokemon_raids', 'raid_id', raid_id, 'raid_comments', "{0}: {1}".format(escape(username, 32), escape(comment, 200)), client)
 
-def get_message_tracking_by_id(raid_id: int):
-    return dynamo.get_item('wokemon_raids', 'raid_id', int(raid_id), 'message_tracking')
+def get_message_tracking_by_id(raid_id: int, client):
+    return dynamo.get_item('wokemon_raids', 'raid_id', int(raid_id), 'message_tracking', client=client)
 
-def insert_message_tracking(raid_id, chat_id, message_id):
-    return dynamo.list_append('wokemon_raids', 'raid_id', raid_id, 'message_tracking', {"{0}".format(chat_id) : message_id})
+def insert_message_tracking(raid_id, chat_id, message_id, client):
+    return dynamo.list_append('wokemon_raids', 'raid_id', raid_id, 'message_tracking', {"{0}".format(chat_id) : message_id}, client)
 
-def join_raid(from_object, raid_id, participation_type_id):
-
+def join_raid(from_object, raid_id, participation_type_id, client):
+    
+    print("In join_raid")
+    
     # Step 1: Verify the user exists in the raiders table
     #         If they don't then create them!
-    if not dynamo.get_item('wokemon_users', 'telegram_id', from_object['id']):
-        dynamo.update_item('wokemon_users', 'telegram_id', from_object['id'], 'telegram_username', get_username(from_object))
+    user = dynamo.get_item('wokemon_users', 'telegram_id', from_object['id'], client=client)
+    if not user:
+        user = dynamo.update_item('wokemon_users', 'telegram_id', from_object['id'], 'telegram_username', get_username(from_object), client).get('Attributes')
     
     # Get raid participation details
-    raid_dict = get_raid_participants_by_id(raid_id)
+    raid_dict = get_raid_participants_by_id(raid_id, client)
     
     # Step 2: If this is not a drop out request, is there space in the raid for another user?
     if participation_type_id < 4 and raid_dict:
@@ -130,12 +132,16 @@ def join_raid(from_object, raid_id, participation_type_id):
         # If there are already 20 people going, then the raid is full
         if (physical_count + remote_count) >= 20:
             # Raid lobby is full
+            print("Player cannot join the raid because the lobby is full.")
+            print("Completed join_raid")
             return False
 
         # If the user will be joining the remote lobby then check there are not 10 in it already
         if participation_type_id == 2 or participation_type_id == 3:
             if remote_count >= 10:
                 # Remote lobby is full
+                print("Player cannot join the raid because the remote lobby is full.")
+                print("Completed join_raid")
                 return False
 
     # There is space available in the raid!
@@ -147,8 +153,8 @@ def join_raid(from_object, raid_id, participation_type_id):
         for participant in raid_dict:
             if participant.get('telegram_id_{0}'.format(str(from_object['id']))):
                 p = participant.get('telegram_id_{0}'.format(str(from_object['id'])))
-            else:
-                list_index+=1
+                p['list_index'] = list_index
+            list_index+=1
 
     # If they are not participating already...
     if not p:
@@ -156,13 +162,17 @@ def join_raid(from_object, raid_id, participation_type_id):
         # ... or that they have pressed the +1 button
         if not (participation_type_id == 0 or participation_type_id == 4):
             # Else we can add them to the raid
-            return dynamo.list_append('wokemon_raids', 'raid_id', raid_id, 'raid_participants_list', {"telegram_id_{0}".format(from_object['id']): {"participation_type": participation_type_id}})
+            print("Adding new player to raid.")
+            print("Completing join_raid by returning list_append")
+            return dynamo.list_append('wokemon_raids', 'raid_id', raid_id, 'raid_participants_list', {"telegram_id_{0}".format(from_object['id']): {"participation_type": participation_type_id, "user_data": get_user_data(user)}}, client)
     
     # If the user is already participating...
     else:
         existing_participation_type = p.get('participation_type')
         # ... ignore duplicate requests
         if existing_participation_type == participation_type_id:
+            print("Duplicate player request.")
+            print("Completed join_raid")
             return False
 
         # ... if they aren't a drop out, they can bring a plus 1?
@@ -170,23 +180,30 @@ def join_raid(from_object, raid_id, participation_type_id):
             # ... However, if they are in the remote lobby, then check there is space
             if existing_participation_type == 2 or existing_participation_type == 3:
                 if remote_count >= 10:
+                    print("Player cannot bring a +1 because remote lobby is full.")
+                    print("Completed join_raid")
                     return False
 
-            return dynamo.increment_list('wokemon_raids', 'raid_id', raid_id, list_index, from_object['id'])
+            print("Adding a players +1 to the raid.")
+            print("Completing join_raid by returning increment_list")
+            return dynamo.increment_list('wokemon_raids', 'raid_id', raid_id, p.get('list_index'), from_object['id'], client)
         
         # ... else they must be changing their participation type
         else:
             # if they were bringing additional people previously, remove these
             if 'additional' in p:
-                dynamo.remove_additional('wokemon_raids', 'raid_id', raid_id, list_index, from_object['id'])
+                print("Removing the players +1s from the raid.")
+                dynamo.remove_additional('wokemon_raids', 'raid_id', raid_id, p.get('list_index'), from_object['id'], client)
 
-            return dynamo.update_raid_participation('wokemon_raids', 'raid_id', raid_id, list_index, from_object['id'], participation_type_id)
+            print("Chaning a players participation type.")
+            print("Completing join_raid by returning update_raid_participation")
+            return dynamo.update_raid_participation('wokemon_raids', 'raid_id', raid_id, p.get('list_index'), from_object['id'], participation_type_id, client)
     
     # I don't think it should be possible to get to this point
     return False
     
-def get_raid_participants_by_id(raid_id: int):
-    return dynamo.get_item('wokemon_raids', 'raid_id', int(raid_id), 'raid_participants_list')
+def get_raid_participants_by_id(raid_id: int, client):
+    return dynamo.get_item('wokemon_raids', 'raid_id', int(raid_id), 'raid_participants_list', client=client)
 
 def return_team_symbol(team_name: str):
 
@@ -199,10 +216,16 @@ def return_team_symbol(team_name: str):
     
     return '?'
 
-def format_raider(telegram_id, participant_dict):
+def get_user_data(user):
+    data = user.get('telegram_username') if not user.get('trainer_name') else user.get('trainer_name')
+    data += '' if not user.get('trainer_team') else f" {return_team_symbol(user.get('trainer_team'))}"
+    data += '' if not user.get('trainer_level') else f" ({user.get('trainer_level')})"
+    return data
+
+def format_raider(telegram_id, participant_dict, client):
 
     telegram_id = telegram_id.replace('telegram_id_', '')
-    user_dict = dynamo.get_item('wokemon_users', 'telegram_id', telegram_id)
+    user_dict = dynamo.get_item('wokemon_users', 'telegram_id', telegram_id, client=client)
 
     player_str = '[{0}](tg://user?id={1})'.format(''.join([user_dict.get('telegram_username') if not user_dict.get('trainer_name') else user_dict.get('trainer_name')]), user_dict.get('telegram_id'))
     player_str += ''.join(['' if not user_dict.get('trainer_team') else ' {0}'.format(return_team_symbol(user_dict.get('trainer_team')))])
@@ -211,7 +234,7 @@ def format_raider(telegram_id, participant_dict):
 
     return player_str
 
-def format_raid_message(raid_dict):
+def format_raid_message(raid_dict, client):
     
     print("In format_raid_message")
     
@@ -247,19 +270,19 @@ def format_raid_message(raid_dict):
             for p in raid_participants_list:
                 for k, v in p.items():
                     if v['participation_type']==1:
-                        physical_str = ''.join(['{0}\n{1}'.format(physical_str, format_raider(k, v)) if not physical_count == 0 else format_raider(k, v)])
+                        physical_str = ''.join(['{0}\n{1}'.format(physical_str, format_raider(k, v, client)) if not physical_count == 0 else format_raider(k, v, client)])
                         physical_count += (1+v.get('additional')) if 'additional' in v else 1
                     
                     elif v['participation_type'] == 2:
-                        remote_str = ''.join(['{0}\n{1}'.format(remote_str, format_raider(k, v)) if not remote_count == 0 else format_raider(k, v)])
+                        remote_str = ''.join(['{0}\n{1}'.format(remote_str, format_raider(k, v, client)) if not remote_count == 0 else format_raider(k, v, client)])
                         remote_count += (1+v.get('additional')) if 'additional' in v else 1
                     
                     elif v['participation_type'] == 3:
-                        invite_str = ''.join(['{0}\n{1}'.format(invite_str, format_raider(k, v)) if not invite_count == 0 else format_raider(k, v)])
+                        invite_str = ''.join(['{0}\n{1}'.format(invite_str, format_raider(k, v, client)) if not invite_count == 0 else format_raider(k, v, client)])
                         invite_count += (1+v.get('additional')) if 'additional' in v else 1
                     
                     elif v['participation_type'] == 4:
-                        dropout_str = ''.join(['{0}\n{1}'.format(dropout_str, format_raider(k, v)) if not dropout_count == 0 else format_raider(k, v)])
+                        dropout_str = ''.join(['{0}\n{1}'.format(dropout_str, format_raider(k, v, client)) if not dropout_count == 0 else format_raider(k, v, client)])
                         dropout_count += v.get('additional') if 'additional' in v else 1
             
             participation = ''.join('*{0} Going In Person:*\n{1}\n'.format(physical_count, physical_str) if not physical_count == 0 else '')
@@ -290,7 +313,7 @@ def format_raid_message(raid_dict):
                                             final_string
                                         )
 
-def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
+def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username, client):
     
     # Stage 1: Validate Raid Params.
     
@@ -348,15 +371,15 @@ def create_raid(raid_params, chat_id, raid_creator_id, raid_creator_username):
     
     # Stage 2: We have the information we need to create a raid.
     #          So lets do that and return the result back to the handler.
-    return insert_raid(raid_dict)
+    return insert_raid(raid_dict, client)
 
-def insert_raid(raid_dict):
+def insert_raid(raid_dict, client):
     
-    counter_value = dynamo.get_item('wokemon_counter', 'counter_id', 0, 'counter_value')
+    counter_value = dynamo.get_item('wokemon_counter', 'counter_id', 0, 'counter_value', client=client)
     raid_id = counter_value+1
-    dynamo.update_item('wokemon_counter', 'counter_id', 0, 'counter_value', raid_id)
+    dynamo.update_item('wokemon_counter', 'counter_id', 0, 'counter_value', raid_id, client)
     
-    response = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'raid_detail', raid_dict)
+    response = dynamo.update_item('wokemon_raids', 'raid_id', raid_id, 'raid_detail', raid_dict, client)
     
     raid_dict["raid_id"] = raid_id
     

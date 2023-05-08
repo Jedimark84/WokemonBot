@@ -1,10 +1,12 @@
 import json
 import os
+import time
 import urllib3
 
 from urllib.parse import quote
 
-TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
+TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN_WokemonNoSQL'] # To use Non Prod
+#TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN_Wokemon'] # To use Prod
 API_URL        = "https://api.telegram.org/bot{0}/".format(TELEGRAM_TOKEN)
 RAID_KEYBOARD  = '&reply_markup={"inline_keyboard":[[ {"text":"✅️","callback_data":1},  \
                                                      {"text":"📍","callback_data":2},  \
@@ -59,30 +61,31 @@ def edit_message(chat_id, message_id, text, parse_mode=None, send_keyboard=None)
         else:
             url += RAID_KEYBOARD
     
-    http = urllib3.PoolManager()
-    resp = http.request('GET', url)
+    resp = http_get(url)
 
 def delete_message(chat_id: int, message_id: int):
     
     url = ''.join([API_URL, 'deleteMessage?chat_id={0}&message_id={1}'.format(chat_id, message_id)])
-    
-    http = urllib3.PoolManager()
-    resp = http.request('GET', url)
+    http_get(url)
 
 def getChat(chat_id: int) -> dict():
     
     url = ''.join([API_URL, 'getChat?chat_id={0}'.format(chat_id)])
-    
-    http = urllib3.PoolManager()
-    resp = http.request('GET', url)
+    resp = http_get(url)
     
     return decode_http_response_as_dict(resp)
 
 # Perform a http GET request and return the response
 def http_get(url: str) -> urllib3.HTTPResponse:
     
+    start_time = time.time()
+    
     http = urllib3.PoolManager()
-    return http.request('GET', url)
+    response = http.request('GET', url)
+    
+    print(f"--- {round(time.time() - start_time, 2)} seconds for http_get({url}) ---")
+    
+    return response
 
 # Decode a HTTPResponse and return as a dict
 def decode_http_response_as_dict(http_response: urllib3.HTTPResponse) -> dict():
